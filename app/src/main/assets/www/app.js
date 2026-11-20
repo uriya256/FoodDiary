@@ -680,8 +680,17 @@ function replaceSheetBody(id, html) {
 const ADD = { meal: 'breakfast', text: '' };
 function openAdd(meal) {
   ADD.meal = meal; ADD.text = '';
-  openSheet('add', addSheetHtml(), { full: true, title: 'הוספה', onClose: () => render({ keepScroll: true }) });
+  openSheet('add', addSheetHtml(), { full: true, title: 'הוספה', onClose: () => { flushAddText(); render({ keepScroll: true }); } });
   setTimeout(() => { const i = $('[data-on="addText"]'); i && i.focus(); }, 300);
+}
+// Whatever is still typed in the box when the sheet closes is added too, so nothing is lost.
+function flushAddText() {
+  const inp = $('#sheets [data-on="addText"]');
+  const t = ((inp && inp.value) || ADD.text || '').trim();
+  ADD.text = '';
+  if (!t) return;
+  const items = P.parseItems(t, lex());
+  if (items.length) addItemsToMeal(S.date, ADD.meal, items);
 }
 function addSheetHtml() {
   const m = ADD.meal;
@@ -694,12 +703,10 @@ function addSheetHtml() {
   const u = usage();
   return sheetHead(`הוספה ל${MEAL[m].label}`) + `<div class="body">
     <div class="seg">${seg}</div>
-    <div class="field">
-      <div class="row">
-        <input class="search grow" type="text" data-on="addText" value="${esc(ADD.text)}" placeholder="למשל: 3 אגוזי מלך, קפה עם חלב" aria-label="מה אכלת" enterkeyhint="done" autocomplete="off">
-        <button class="iconbtn primary" data-act="addTyped" aria-label="הוספה">${icon('plus')}</button>
-      </div>
-    </div>
+    <form class="row" data-form="add" autocomplete="off">
+      <input class="search grow" type="text" data-on="addText" value="${esc(ADD.text)}" placeholder="למשל: 3 אגוזי מלך, קפה עם חלב" aria-label="מה אכלת" enterkeyhint="send" autocomplete="off">
+      <button type="submit" class="iconbtn primary" aria-label="הוספה">${icon('plus')}</button>
+    </form>
     <div id="addLive">${addLiveHtml()}</div>
     ${items.length ? `<div class="section-t">ב${MEAL[m].label} עכשיו</div>
     <div class="list">${items.map((it, i) => `<div class="li"><button class="grow" style="border:none;background:none;text-align:right;padding:0;min-height:44px" data-act="editItem" data-meal="${m}" data-idx="${i}"><span class="t">${esc(P.formatItem(it))}</span></button>
@@ -720,7 +727,7 @@ function addLiveHtml() {
   const k = nk(t);
   const sugg = allFoodNames().filter(n => nk(n).includes(k) && nk(n) !== k).sort((a, b) => ((usage()[b] || {}).n || 0) - ((usage()[a] || {}).n || 0)).slice(0, 8);
   let h = '';
-  if (parsed.length) h += `<div class="preview"><span class="small muted">יתווסף:</span><div class="chips">${parsed.map(it => `<span class="chip sel">${esc(P.formatItem(it))}</span>`).join('')}</div></div>`;
+  if (parsed.length) h += `<div class="preview"><span class="small muted">יתווסף בלחיצה על + או על "סיום":</span><div class="chips">${parsed.map(it => `<span class="chip sel">${esc(P.formatItem(it))}</span>`).join('')}</div></div>`;
   if (sugg.length) h += `<div class="chips">${sugg.map(n => `<button class="chip" data-act="quickAdd" data-name="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
   return h;
 }
@@ -992,6 +999,8 @@ const ACT = {
   openAdd(el) { openAdd(el.dataset.meal); },
   addMeal(el) { ADD.meal = el.dataset.v; replaceSheetBody('add', addSheetHtml()); },
   addTyped() {
+    const inp = $('#sheets [data-on="addText"]');
+    if (inp) ADD.text = inp.value;
     const t = ADD.text.trim();
     if (!t) return;
     const items = P.parseItems(t, lex());
@@ -1309,8 +1318,11 @@ document.addEventListener('change', (e) => {
   if (el.tagName === 'SELECT' || el.type === 'time') { const fn = ON[el.dataset.on]; if (fn && el.dataset.on !== 'eUnit') fn(el, e); }
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.on === 'addText') { e.preventDefault(); ACT.addTyped(); }
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.on === 'promptVal' && e.target.tagName === 'INPUT') { e.preventDefault(); ACT.promptOk(); }
+});
+document.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (e.target.dataset.form === 'add') ACT.addTyped();
 });
 $('#datePicker').addEventListener('change', (e) => { if (e.target.value) setDate(e.target.value); });
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (db.settings.theme === 'auto') applyTheme(); });
