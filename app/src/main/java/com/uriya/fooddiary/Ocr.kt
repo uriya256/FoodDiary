@@ -39,7 +39,7 @@ object Ocr {
     }
 
     /** Loads the picture upright and not larger than [maxSide]. */
-    fun loadBitmap(ctx: Context, uri: Uri, maxSide: Int = 2400): Bitmap? {
+    fun loadBitmap(ctx: Context, uri: Uri, maxSide: Int = 1800): Bitmap? {
         val cr = ctx.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }

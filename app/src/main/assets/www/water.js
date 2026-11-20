@@ -129,6 +129,7 @@ function bottleSvg(pct, fromPct) {
     <rect x="30" y="6" width="30" height="15" rx="4" fill="#2C8FB5"/>
     <rect x="30" y="6" width="30" height="5" rx="2.5" fill="#fff" opacity=".25"/>
     <path d="M22 62v70" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>
+    <text x="45" y="104" text-anchor="middle" direction="ltr" unicode-bidi="bidi-override" class="bpct">${Math.round(pct * 100)}%</text>
   </svg>`;
 }
 
@@ -157,15 +158,15 @@ function waterCardHtml(iso) {
     <div class="row between"><h2 class="row">${icon('drop', 20, 'style="color:#2C8FB5"')}${tr('מים', 'Water')}</h2>
       <button class="iconbtn flat" data-act="openDrinks" aria-label="${tr('עוד אפשרויות שתייה', 'More drink options')}">${icon('dots')}</button></div>
     <div class="water-main">
-      <button class="bottle-btn" data-act="openDrinks" aria-label="${tr('הוספת שתייה', 'Add a drink')}">${bottleSvg(pct, from)}<span class="bpct">${Math.round(pct * 100)}%</span></button>
+      <button class="bottle-btn" data-act="openDrinks" aria-label="${tr('הוספת שתייה', 'Add a drink')}">${bottleSvg(pct, from)}</button>
       <div class="water-info">
         <div class="wtotal"><b>${fmtL(total)}</b><span> / ${fmtL(w.goalMl)} ${tr('ליטר', 'L')}</span></div>
         <div class="wpace ${pace.kind}">${pace.text}</div>
         ${fromMeals ? `<div class="small muted">${tr(`כולל ${fmtAmount(fromMeals)} שנרשמו בארוחות`, `Includes ${fmtAmount(fromMeals)} logged in meals`)}</div>` : ''}
         <div class="small muted" style="margin-top:2px">${esc(bottleName(b))} · ${fmtAmount(b.ml)}</div>
         <div class="wquick">
-          ${q.map(([f, l]) => `<button class="wq" data-act="drink" data-ml="${roundMl(b.ml * f)}"><b>${l}</b><span>+${roundMl(b.ml * f)}</span></button>`).join('')}
-          <button class="wq cup" data-act="drink" data-ml="${w.cupMl}">${icon('glass', 18)}<span>+${w.cupMl}</span></button>
+          ${q.map(([f, l]) => `<button class="wq" data-act="drink" data-ml="${roundMl(b.ml * f)}"><b>${l}</b><span dir="ltr">+${roundMl(b.ml * f)}</span></button>`).join('')}
+          <button class="wq cup" data-act="drink" data-ml="${w.cupMl}">${icon('glass', 18)}<span dir="ltr">+${w.cupMl}</span></button>
         </div>
         ${lastDrink ? `<button class="wundo" data-act="undoDrink">${icon('undo', 14)}${tr(`ביטול אחרון (${fmtAmount(lastDrink.ml)}${lastDrink.t ? ' ב-' + lastDrink.t : ''})`, `Undo last (${fmtAmount(lastDrink.ml)}${lastDrink.t ? ' at ' + lastDrink.t : ''})`)}</button>` : ''}
       </div>

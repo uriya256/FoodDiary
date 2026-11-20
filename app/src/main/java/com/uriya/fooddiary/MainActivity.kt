@@ -21,6 +21,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import android.content.ClipboardManager
+import android.content.ClipData
+import android.content.ActivityNotFoundException
 import android.content.Context
 import java.io.File
 import androidx.core.view.ViewCompat
@@ -64,46 +66,91 @@ class MainActivity : ComponentActivity() {
 
     // ---------- photo of a written note -> text ----------
     private var photoUri: Uri? = null
+    private var photoMode = "ocr" // "ocr" = read it here offline, "lens" = send the photo to Google Lens
 
     private val takePhoto = registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val u = photoUri
-        if (ok && u != null) ocrFrom(u) else js("window.onOcrText && window.onOcrText(null, 'cancel')")
+        if (ok && u != null) gotPhoto(u) else js("window.onOcrText && window.onOcrText(null, 'cancel')")
     }
     private val pickPhoto = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) ocrFrom(uri) else js("window.onOcrText && window.onOcrText(null, 'cancel')")
+        if (uri != null) gotPhoto(uri) else js("window.onOcrText && window.onOcrText(null, 'cancel')")
     }
 
-    fun ocrCamera() {
+    private fun gotPhoto(uri: Uri) {
+        if (photoMode == "lens") sendToLens(uri) else ocrFrom(uri)
+    }
+
+    private fun newPhotoUri(): Uri {
+        val dir = File(cacheDir, "ocr").apply { mkdirs() }
+        val f = File(dir, "note-${System.currentTimeMillis()}.jpg")
+        dir.listFiles()?.filter { it.name != f.name && System.currentTimeMillis() - it.lastModified() > 3600_000 }?.forEach { it.delete() }
+        return FileProvider.getUriForFile(this, "$packageName.files", f)
+    }
+
+    /** mode: "ocr" or "lens"; source: "camera" or "gallery" */
+    fun photo(mode: String, source: String) {
         runOnUiThread {
+            photoMode = mode
             try {
-                val dir = File(cacheDir, "ocr").apply { mkdirs() }
-                val f = File(dir, "note.jpg")
-                val u = FileProvider.getUriForFile(this, "$packageName.files", f)
-                photoUri = u
-                takePhoto.launch(u)
+                if (source == "gallery") pickPhoto.launch("image/*")
+                else { val u = newPhotoUri(); photoUri = u; takePhoto.launch(u) }
             } catch (e: Exception) {
-                js("window.onOcrText && window.onOcrText(null, 'nocamera')")
+                js("window.onOcrText && window.onOcrText(null, 'nocamera', " + JSONObject.quote(e.toString()) + ")")
             }
         }
     }
 
-    fun ocrGallery() {
-        runOnUiThread {
-            try { pickPhoto.launch("image/*") } catch (e: Exception) { js("window.onOcrText && window.onOcrText(null, 'error')") }
-        }
-    }
+    fun ocrCamera() = photo("ocr", "camera")
+    fun ocrGallery() = photo("ocr", "gallery")
 
     private fun ocrFrom(uri: Uri) {
         js("window.onOcrStart && window.onOcrStart()")
         Thread {
+            var err: String? = null
             val result = try {
                 val bmp = Ocr.loadBitmap(this, uri)
-                if (bmp == null) null else Ocr.recognize(this, bmp)
-            } catch (e: Throwable) { null }
-            if (result == null) js("window.onOcrText && window.onOcrText(null, 'error')")
+                if (bmp == null) { err = "image"; null } else Ocr.recognize(this, bmp).also { if (it == null) err = "data" }
+            } catch (e: Throwable) { err = e.toString(); null }
+            if (result == null) js("window.onOcrText && window.onOcrText(null, 'error', " + JSONObject.quote(err ?: "") + ")")
             else js("window.onOcrText && window.onOcrText(" + JSONObject.quote(result) + ", 'ok')")
         }.start()
     }
+
+    /** Hands the photo to Google Lens (inside the Google app); the user copies the text there. */
+    private fun sendToLens(uri: Uri) {
+        val shareable = if (uri.authority == "$packageName.files") uri else copyToCache(uri) ?: uri
+        fun send(pkg: String?): Boolean {
+            val i = Intent(Intent.ACTION_SEND).apply {
+                type = "image/jpeg"
+                putExtra(Intent.EXTRA_STREAM, shareable)
+                clipData = ClipData.newRawUri("note", shareable)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (pkg != null) setPackage(pkg)
+            }
+            return try { startActivity(i); true } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
+        }
+        if (send("com.google.android.googlequicksearchbox") || send("com.google.ar.lens")) {
+            js("window.onLensOpened && window.onLensOpened()")
+            return
+        }
+        // No Google app: let the user pick where to send the photo
+        try {
+            val i = Intent(Intent.ACTION_SEND).apply {
+                type = "image/jpeg"; putExtra(Intent.EXTRA_STREAM, shareable)
+                clipData = ClipData.newRawUri("note", shareable); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(i, "Google Lens"))
+            js("window.onLensOpened && window.onLensOpened()")
+        } catch (e: Exception) {
+            js("window.onOcrText && window.onOcrText(null, 'nolens')")
+        }
+    }
+
+    private fun copyToCache(uri: Uri): Uri? = try {
+        val target = newPhotoUri()
+        contentResolver.openInputStream(uri)?.use { input -> contentResolver.openOutputStream(target)?.use { input.copyTo(it) } }
+        target
+    } catch (_: Exception) { null }
 
     fun openLens(): Boolean {
         val tries = listOf(
@@ -194,6 +241,8 @@ class MainActivity : ComponentActivity() {
             override fun onPageFinished(view: WebView, url: String) {
                 pageReady = true
                 insetsJs?.let { js(it) }
+                val queued = pendingJs.toList(); pendingJs.clear()
+                queued.forEach { web.evaluateJavascript(it, null) }
                 pendingShared?.let { deliverShared(it) }
                 pendingShared = null
             }
@@ -230,6 +279,8 @@ class MainActivity : ComponentActivity() {
         })
 
         handleShareIntent(intent)
+        savedInstanceState?.getString("photoUri")?.let { photoUri = Uri.parse(it) }
+        savedInstanceState?.getString("photoMode")?.let { photoMode = it }
         if (savedInstanceState != null) web.restoreState(savedInstanceState)
         else web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
     }
@@ -239,6 +290,8 @@ class MainActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         web.saveState(outState)
+        photoUri?.let { outState.putString("photoUri", it.toString()) }
+        outState.putString("photoMode", photoMode)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -270,8 +323,13 @@ class MainActivity : ComponentActivity() {
         js("window.onSharedText && window.onSharedText(" + JSONObject.quote(text) + ")")
     }
 
+    private val pendingJs = mutableListOf<String>()
+
     fun js(code: String) {
-        runOnUiThread { if (::web.isInitialized) web.evaluateJavascript(code, null) }
+        runOnUiThread {
+            if (!::web.isInitialized) return@runOnUiThread
+            if (pageReady) web.evaluateJavascript(code, null) else pendingJs.add(code)
+        }
     }
 
     fun setBars(bg: String, dark: Boolean) {

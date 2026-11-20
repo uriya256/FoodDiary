@@ -65,6 +65,10 @@ class Bridge(private val act: MainActivity) {
     fun setBars(bg: String, dark: Boolean) = act.setBars(bg, dark)
 
     // ---------- reading a written note ----------
+    /** mode: "ocr" (read offline) or "lens" (send to Google Lens); source: "camera" or "gallery" */
+    @JavascriptInterface
+    fun photo(mode: String, source: String) = act.photo(mode, source)
+
     @JavascriptInterface
     fun ocrCamera() = act.ocrCamera()
 

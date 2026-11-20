@@ -803,7 +803,7 @@ function editHtml() {
     <label class="field"><span>${tr('מאכל', 'Food')}</span><input type="text" value="${esc(it.name)}" data-on="eName" list="foodNames" autocomplete="off"></label>
     <datalist id="foodNames">${allFoodNames().slice(0, 400).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <div class="row" style="gap:12px;align-items:flex-end">
-      <div class="field"><span>${tr('כמות', 'Amount')}</span><div class="stepper"><button class="iconbtn plain" data-act="eQty" data-d="-1" aria-label="${tr('פחות', 'Less')}">${icon('minus', 18)}</button><span class="val" id="eQtyVal">${it.qty == null ? '–' : esc(P.fmtQty(it.qty))}</span><button class="iconbtn plain" data-act="eQty" data-d="1" aria-label="${tr('יותר', 'More')}">${icon('plus', 18)}</button><button class="btn" style="min-width:52px;padding:0 10px" data-act="eHalf" aria-label="${tr('הוסף חצי', 'Add a half')}">+½</button></div></div>
+      <div class="field"><span>${tr('כמות', 'Amount')}</span><div class="stepper"><button class="iconbtn plain" data-act="eQty" data-d="-1" aria-label="${tr('פחות', 'Less')}">${icon('minus', 18)}</button><span class="val" id="eQtyVal">${it.qty == null ? '–' : esc(P.fmtQty(it.qty))}</span><button class="iconbtn plain" data-act="eQty" data-d="1" aria-label="${tr('יותר', 'More')}">${icon('plus', 18)}</button><button class="btn" style="min-width:52px;padding:0 10px" data-act="eHalf" aria-label="${tr('הוסף חצי', 'Add a half')}"><span dir="ltr">+½</span></button></div></div>
       <label class="field grow"><span>${tr('יחידה', 'Unit')}</span><select data-on="eUnit"><option value="">${tr('ללא', 'None')}</option>${units}</select></label>
     </div>
     <label class="field"><span>${tr('עם (מופרד בפסיקים)', 'With (comma separated)')}</span><input type="text" value="${esc((it.with || []).join(', '))}" data-on="eWith" placeholder="${tr('למשל: גזר, מלפפון', 'e.g. carrot, cucumber')}"></label>
@@ -923,13 +923,17 @@ function scanBoxHtml() {
   const app = !!(A && A.ocrCamera);
   return `<div class="scanbox">
     <div class="row" style="gap:10px"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span><b class="grow">${tr('מפתק שכתבת ביד', 'From a handwritten note')}</b></div>
-    ${app ? `<button class="btn primary block" data-act="lens">${icon('sparkle', 18)}${tr('צלם עם Google Lens', 'Scan with Google Lens')}</button>
-    <div class="small muted">${tr('הכי מדויק לכתב יד. ב-Lens: מצלמים את הפתק, בוחרים "טקסט", מסמנים הכל ולוחצים "העתקה". כשחוזרים לכאן הטקסט נכנס לבד.', 'Most accurate for handwriting. In Lens: photograph the note, choose "Text", select all and tap "Copy". When you come back here the text is pasted for you.')}</div>
+    ${app ? `<div class="section-t" style="margin:0">${icon('sparkle', 16)} ${tr('Google Lens · הכי מדויק לכתב יד', 'Google Lens · best for handwriting')}</div>
+    <div class="row" style="gap:8px">
+      <button class="btn primary grow" data-act="lensCam">${icon('camera', 18)}${tr('צילום', 'Camera')}</button>
+      <button class="btn primary grow" data-act="lensGal">${icon('image', 18)}${tr('מהגלריה', 'Gallery')}</button>
+    </div>
+    <div class="small muted">${tr('התמונה נפתחת ב-Lens. שם לוחצים "טקסט", "בחירת הכל" ו"העתקה", וחוזרים לכאן (כפתור "חזור"). הטקסט נכנס לבד; אם לא, לוחצים "הדבק מהלוח".', 'The photo opens in Lens. Tap "Text", "Select all" and "Copy", then come back here (Back button). The text is pasted for you; if not, tap "Paste from clipboard".')}</div>
+    <div class="section-t" style="margin:6px 0 0">${tr('בלי אינטרנט · לאותיות דפוס ברורות', 'Offline · clear block letters only')}</div>
     <div class="row" style="gap:8px">
       <button class="btn grow" data-act="ocrCam">${icon('camera', 18)}${tr('צילום', 'Camera')}</button>
       <button class="btn grow" data-act="ocrGal">${icon('image', 18)}${tr('מהגלריה', 'Gallery')}</button>
-    </div>
-    <div class="small muted">${tr('זיהוי בלי אינטרנט. עובד טוב רק עם אותיות דפוס ברורות; כתב יד מחובר כמעט לא יזוהה.', 'Offline recognition. Works well only with clear block letters; joined-up handwriting is rarely recognized.')}</div>` : ''}
+    </div>` : ''}
     <button class="btn soft block" data-act="pasteClip">${icon('paste', 18)}${tr('הדבק מהלוח', 'Paste from clipboard')}</button>
   </div>
   <div class="small muted">${tr('בכל דרך, הטקסט מופיע כאן למטה. בדוק ותקן אותו לפני הניתוח, כדי שיישמר בדיוק מה שכתבת.', 'Either way, the text appears below. Check and fix it before reading it in, so exactly what you wrote is saved.')}</div>`;
@@ -1414,14 +1418,10 @@ const ACT = {
     toast(tr('נמחקה', 'Deleted'), { label: tr('ביטול', 'Undo'), fn: () => { db.templates.splice(i, 0, t); save(); replaceSheetBody('tpls', tplsHtml()); render({ keepScroll: true }); } });
   },
   openImport(el) { openImport(el.dataset.mode || 'history'); },
-  lens() {
-    if (!A || !A.openLens) return;
-    IMP.awaitClip = true;
-    IMP.clipBefore = A.readClipboard ? A.readClipboard() : '';
-    if (!A.openLens()) { IMP.awaitClip = false; toast(tr('Google Lens לא נמצא בטלפון. אפשר להשתמש בצילום האופליין', 'Google Lens was not found. You can use the offline camera instead')); }
-  },
-  ocrCam() { if (A && A.ocrCamera) A.ocrCamera(); },
-  ocrGal() { if (A && A.ocrGallery) A.ocrGallery(); },
+  lensCam() { startLens('camera'); },
+  lensGal() { startLens('gallery'); },
+  ocrCam() { if (A && A.photo) A.photo('ocr', 'camera'); else if (A && A.ocrCamera) A.ocrCamera(); },
+  ocrGal() { if (A && A.photo) A.photo('ocr', 'gallery'); else if (A && A.ocrGallery) A.ocrGallery(); },
   async pasteClip() {
     let t = '';
     try { t = A && A.readClipboard ? A.readClipboard() : await navigator.clipboard.readText(); } catch (e) { }
@@ -1558,11 +1558,44 @@ window.setInsets = (top, bottom) => {
   document.documentElement.style.setProperty('--sab', bottom + 'px');
 };
 window.onSharedText = (text) => { while (sheetStack.length) closeSheet(); setTimeout(() => openImport(/\d{1,2}[\/.]\d{1,2}/.test(text) ? 'history' : 'day', text), 250); };
-window.onOcrStart = () => toast(tr('מזהה טקסט בתמונה…', 'Reading the photo…'));
-window.onOcrText = (text, status) => {
+window.onOcrStart = () => toast(tr('קורא את התמונה… זה יכול לקחת כמה שניות', 'Reading the photo… this can take a few seconds'));
+function startLens(source) {
+  if (!A || !A.photo) return;
+  IMP.clipBefore = A.readClipboard ? A.readClipboard() : '';
+  A.photo('lens', source);
+}
+window.onLensOpened = () => { IMP.awaitClip = true; IMP.awaitSince = Date.now(); };
+/** Back from Lens: look at the clipboard a few times (Android only shares it once the app has focus). */
+function checkLensClipboard() {
+  if (!IMP.awaitClip || !A || !A.readClipboard || IMP.checking) return;
+  IMP.checking = true;
+  let tries = 0;
+  const tick = () => {
+    if (!IMP.awaitClip) { IMP.checking = false; return; }
+    const c = A.readClipboard();
+    if (c && c.trim() && c !== IMP.clipBefore) {
+      IMP.awaitClip = false;
+      if (!sheetStack.find(s => s.id === 'import')) openImport(IMP.mode || 'day');
+      setImportText(c, true);
+      toast(tr('הטקסט מ-Lens נכנס. בדוק ותקן לפני הניתוח', 'Text from Lens pasted. Check and fix it before reading it in'));
+      IMP.checking = false;
+    } else if (++tries < 6) setTimeout(tick, 600);
+    else { IMP.checking = false; IMP.awaitClip = false; toast(tr('לא מצאתי טקסט מועתק. ב-Lens לחץ "העתקה" ואז "הדבק מהלוח"', 'No copied text found. In Lens tap "Copy", then "Paste from clipboard"')); }
+  };
+  setTimeout(tick, 500);
+}
+window.addEventListener('focus', checkLensClipboard);
+window.onOcrText = (text, status, detail) => {
   if (status === 'cancel') return;
-  if (status === 'nocamera') { toast(tr('לא נמצאה מצלמה', 'No camera found')); return; }
-  if (text == null) { toast(tr('הזיהוי נכשל. נסה תמונה חדה יותר', 'Recognition failed. Try a sharper photo')); return; }
+  if (status === 'nocamera') { toast(tr('לא הצלחתי לפתוח את המצלמה', "Couldn't open the camera") + (detail ? ` (${detail})` : '')); return; }
+  if (status === 'nolens') { toast(tr('לא נמצאה אפליקציית Google עם Lens. אפשר להתקין "Google" מחנות Play', 'No Google app with Lens found. You can install "Google" from the Play Store')); return; }
+  if (text == null) {
+    const why = detail === 'image' ? tr('לא הצלחתי לפתוח את התמונה', "Couldn't open the photo")
+      : detail === 'data' ? tr('קובצי הזיהוי חסרים באפליקציה', 'Recognition files are missing in the app')
+      : tr('הזיהוי נכשל', 'Recognition failed') + (detail ? ` (${detail.slice(0, 80)})` : '');
+    toast(why);
+    return;
+  }
   if (!sheetStack.find(s => s.id === 'import')) openImport(IMP.mode || 'day');
   if (setImportText(text, true)) toast(tr('זוהה טקסט. בדוק ותקן לפני הניתוח', 'Text found. Check and fix it before reading it in'));
   else toast(tr('לא זוהה טקסט בתמונה', 'No text found in the photo'));
@@ -1577,12 +1610,7 @@ document.addEventListener('visibilitychange', () => {
     S.lastSeen = t;
     if (pullPendingWater() && S.tab === 'today') render({ keepScroll: true });
     if (S.tab === 'today' && !sheetStack.length) render({ keepScroll: true });
-    if (IMP.awaitClip && A && A.readClipboard) {
-      setTimeout(() => {
-        const c = A.readClipboard();
-        if (c && c !== IMP.clipBefore) { IMP.awaitClip = false; setImportText(c, true); toast(tr('הטקסט מ-Lens נכנס. בדוק ותקן לפני הניתוח', 'Text from Lens pasted. Check and fix it before reading it in')); }
-      }, 700);
-    }
+    checkLensClipboard();
   }
 });
 
