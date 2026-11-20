@@ -412,11 +412,7 @@ function render(opts = {}) {
 
 /* ---------------- view: today ---------------- */
 function itemChip(it, meal, idx) {
-  const main = P.formatItem(Object.assign({}, it, { with: [], note: '' }));
-  let q = '';
-  let name = main;
-  const m = main.match(/^(\S+)\s(.+)$/);
-  if (it.qty != null && m && !(it.unit && FD.AFTER_UNITS.has(it.unit))) { q = m[1]; name = m[2]; }
+  const [q, name] = P.formatParts(it);
   const extra = [];
   if (it.with && it.with.length) extra.push(tr('עם ', 'with ') + P.joinVav(it.with));
   if (it.note) extra.push(it.note);
@@ -794,7 +790,7 @@ function editHtml() {
     <label class="field"><span>${tr('מאכל', 'Food')}</span><input type="text" value="${esc(it.name)}" data-on="eName" list="foodNames" autocomplete="off"></label>
     <datalist id="foodNames">${allFoodNames().slice(0, 400).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <div class="row" style="gap:12px;align-items:flex-end">
-      <div class="field"><span>${tr('כמות', 'Amount')}</span><div class="stepper"><button class="iconbtn plain" data-act="eQty" data-d="-1" aria-label="${tr('פחות', 'Less')}">${icon('minus', 18)}</button><span class="val" id="eQtyVal">${it.qty == null ? '–' : esc(P.fmtQty(it.qty))}</span><button class="iconbtn plain" data-act="eQty" data-d="1" aria-label="${tr('יותר', 'More')}">${icon('plus', 18)}</button></div></div>
+      <div class="field"><span>${tr('כמות', 'Amount')}</span><div class="stepper"><button class="iconbtn plain" data-act="eQty" data-d="-1" aria-label="${tr('פחות', 'Less')}">${icon('minus', 18)}</button><span class="val" id="eQtyVal">${it.qty == null ? '–' : esc(P.fmtQty(it.qty))}</span><button class="iconbtn plain" data-act="eQty" data-d="1" aria-label="${tr('יותר', 'More')}">${icon('plus', 18)}</button><button class="btn" style="min-width:52px;padding:0 10px" data-act="eHalf" aria-label="${tr('הוסף חצי', 'Add a half')}">+½</button></div></div>
       <label class="field grow"><span>${tr('יחידה', 'Unit')}</span><select data-on="eUnit"><option value="">${tr('ללא', 'None')}</option>${units}</select></label>
     </div>
     <label class="field"><span>${tr('עם (מופרד בפסיקים)', 'With (comma separated)')}</span><input type="text" value="${esc((it.with || []).join(', '))}" data-on="eWith" placeholder="${tr('למשל: גזר, מלפפון', 'e.g. carrot, cucumber')}"></label>
@@ -1117,6 +1113,10 @@ const ACT = {
     else q = q <= 0.5 ? null : (q <= 1 ? q - 0.5 : q - 1);
     EDIT.it.qty = q;
     $('#eQtyVal').textContent = q == null ? '–' : P.fmtQty(q);
+  },
+  eHalf() {
+    EDIT.it.qty = (EDIT.it.qty == null ? 1 : EDIT.it.qty) + 0.5;
+    $('#eQtyVal').textContent = P.fmtQty(EDIT.it.qty);
   },
   editTo(el) { EDIT.to = el.dataset.v; $$('[data-act="editTo"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === EDIT.to)); },
   eSave() {

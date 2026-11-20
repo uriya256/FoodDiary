@@ -40,7 +40,9 @@
       .replace(/(\d)([א-תa-zA-Z])/g, '$1 $2')
       .replace(/([א-תa-zA-Z])(\d)/g, '$1 $2')
       .replace(/\b(\d+)\s*\/\s*(\d+)\b/g, (m, a, b) => String(+a / +b))
-      .replace(/½/g, ' 0.5 ')
+      .replace(/½/g, ' 0.5 ').replace(/¼/g, ' 0.25 ').replace(/¾/g, ' 0.75 ')
+      .replace(/שלושת\s+רבעי/g, ' 0.75 ')
+      .replace(/(\d)\s*0\.(25|5|75)\b/g, (m, a, b) => String(+a + +('0.' + b)))
       .replace(/[()[\]{}!?:•*]/g, ' ')
       .replace(/([,;+|\n–—])/g, ' , ')
       .replace(/(\S)\.(\s|$)/g, '$1 , ')
@@ -108,7 +110,7 @@
   function parseItems(text, lex) {
     const tok = tokenize(text);
     const items = [];
-    let cur = null, mode = 'normal', pQty = null, pUnit = null, conj = false, adjacent = false;
+    let cur = null, mode = 'normal', pQty = null, pUnit = null, conj = false, adjacent = false, vavAdj = false;
 
     const start = (name, known) => {
       cur = { name, qty: pQty, unit: pUnit, with: [], note: '', known };
@@ -120,7 +122,7 @@
       const t = tok[i];
       const next = tok[i + 1];
       if (SEP.has(t)) { cur = null; mode = 'normal'; conj = false; adjacent = false; continue; }
-      if (t === 'ו') { conj = true; adjacent = false; continue; }
+      if (t === 'ו') { vavAdj = adjacent === true; conj = true; adjacent = false; continue; }
       if (t === 'עם' || t === 'ועם') { if (cur) mode = 'with'; adjacent = false; conj = false; continue; }
       if (t === 'ללא' || t === 'בלי' || t === 'וללא' || t === 'ובלי' || t === '~without' || t === '~no') {
         if (cur) { mode = 'without'; cur.note = (cur.note ? cur.note + ', ' : '') + (t[0] === '~' ? t.slice(1) : 'ללא'); }
@@ -131,6 +133,13 @@
       if (sv && FILLER.has(sv)) { conj = true; adjacent = false; continue; }
 
       const num = parseNum(t);
+      // "כוס וחצי", "2 כוסות וחצי", "אבוקדו וחצי", "and a half": add to the amount before it
+      if (num && (num.n === 0.5 || num.n === 0.25) && (num.conj || tok[i - 1] === 'ו')) {
+        if (pQty != null) { pQty += num.n; conj = false; continue; }
+        if (cur && (adjacent === true || (tok[i - 1] === 'ו' && vavAdj)) && isBoundary(next) && mode !== 'with') {
+          cur.qty = (cur.qty == null ? 1 : cur.qty) + num.n; adjacent = false; conj = false; continue;
+        }
+      }
       if (num) {
         if (cur && cur.qty == null && COMPOSITE[cur.name] && next && COMPOSITE[cur.name].includes(next)) {
           cur.qty = num.n; cur.unit = 'ביצים'; i++; adjacent = false; mode = 'normal'; continue;
@@ -297,7 +306,7 @@
   const isLatin = (x) => /^[A-Za-z]/.test(x || '');
   function enPlural(name) {
     if (!isLatin(name) || /s$/i.test(name)) return name;
-    if (/(x|ch|sh|o)$/i.test(name)) return name + 'es';
+    if (/(x|ch|sh|tomato|potato)$/i.test(name)) return name + 'es';
     if (/[^aeiou]y$/i.test(name)) return name.slice(0, -1) + 'ies';
     return name + 's';
   }
@@ -310,19 +319,52 @@
     return T ? T[LANG === 'en' ? 1 : 0] : code;
   }
 
+  // Hebrew amounts: "חצי כוס", "כוס וחצי", "שלושת רבעי כוס", "2 כוסות וחצי", "3 משולשי עוף"
+  function heAmount(q, unit) {
+    const S = SINGULAR[unit] || unit;
+    const C = CONSTRUCT[unit] || unit;
+    const SC = { 'פרוסה': 'פרוסת', 'חתיכה': 'חתיכת', 'קערה': 'קערת', 'מנה': 'מנת', 'קופסה': 'קופסת', 'יחידה': 'יחידת' }[S] || S; // "פרוסת לחם"
+    const whole = Math.floor(q + 1e-9), frac = Math.round((q - whole) * 100) / 100;
+    const fracWord = { 0.5: 'וחצי', 0.25: 'ורבע', 0.75: 'ושלושה רבעים' }[frac];
+    if (q === 1) return SC;
+    if (q === 0.5) return `חצי ${SC}`;
+    if (q === 0.25) return `רבע ${SC}`;
+    if (q === 0.75) return `שלושת רבעי ${SC}`;
+    if (whole === 1 && fracWord) return `${S} ${fracWord}`;
+    if (whole >= 2 && fracWord) return `${whole} ${unit} ${fracWord}`;
+    return `${fmtQty(q)} ${C}`;
+  }
+  function enNum(q) {
+    const whole = Math.floor(q + 1e-9), frac = Math.round((q - whole) * 100) / 100;
+    const f = { 0.5: '½', 0.25: '¼', 0.75: '¾' }[frac];
+    if (f) return (whole ? whole : '') + f;
+    return String(Math.round(q * 100) / 100);
+  }
+  /** The amount part and the food part, e.g. ["חצי כוס", "חלב"]. */
+  function formatParts(it) {
+    const en = LANG === 'en';
+    const q = it.qty;
+    const plural = (n) => (PLURALS[n] || (isLatin(n) ? enPlural(n) : null)) || n;
+    if (it.unit && AFTER_UNITS.has(it.unit)) {
+      return ['', q == null ? it.name : `${it.name} ${en ? enNum(q) : fmtQty(q)} ${unitLabel(it.unit, q <= 1 ? 1 : 2)}`];
+    }
+    if (q != null && it.unit) {
+      if (en) { const ul = unitLabel(it.unit, q <= 1 ? 1 : 2); return [`${enNum(q)} ${ul}${ul === 'g' ? '' : ' of'}`, it.name]; }
+      return [heAmount(q, it.unit), it.name];
+    }
+    if (q == null || q === 1) return ['', it.name];
+    if (en) return [enNum(q), q > 1 ? plural(it.name) : it.name];
+    if (q === 0.5) return ['חצי', it.name];
+    if (q === 0.25) return ['רבע', it.name];
+    if (q === 0.75) return ['שלושת רבעי', it.name];
+    if (q === 1.5) return ['', `${it.name} וחצי`];
+    return [fmtQty(q), plural(it.name)];
+  }
   function formatItem(it, opts) {
     opts = opts || {};
-    let s;
-    const q = fmtQty(it.qty);
     const en = LANG === 'en';
-    if (it.unit && AFTER_UNITS.has(it.unit)) s = `${it.name} ${q} ${unitLabel(it.unit, it.qty)}`.trim();
-    else if (it.qty != null && it.unit) {
-      const ul = unitLabel(it.unit, it.qty);
-      if (en) s = `${it.qty === 1 ? '1' : q} ${ul}${ul === 'g' ? '' : ' of'} ${it.name}`;
-      else s = it.qty === 1 ? `${ul} ${it.name}` : `${q} ${CONSTRUCT[ul] || ul} ${it.name}`;
-    }
-    else if (it.qty != null && it.qty !== 1) s = `${q} ${(it.qty > 1 && (PLURALS[it.name] || (isLatin(it.name) ? enPlural(it.name) : null))) || it.name}`;
-    else s = it.name;
+    const [a, b] = formatParts(it);
+    let s = a ? `${a} ${b}` : b;
     if (!opts.short) {
       if (it.with && it.with.length) s += (en ? ' with ' : ' עם ') + joinVav(it.with);
       if (it.note) s += ' ' + it.note;
@@ -361,7 +403,7 @@
     return out.join('\n');
   }
 
-  const api = { setLang, unitName, warnText, joinVav, MEALS, MEAL_LABELS, tokenize, parseItems, parseDiary, formatItem, fmtQty, unitLabel, dayToText, weekdayName, displayDate, isoDate };
+  const api = { formatParts, setLang, unitName, warnText, joinVav, MEALS, MEAL_LABELS, tokenize, parseItems, parseDiary, formatItem, fmtQty, unitLabel, dayToText, weekdayName, displayDate, isoDate };
   if (typeof module !== 'undefined') module.exports = api;
   else root.Parser = api;
 })(typeof window !== 'undefined' ? window : globalThis);
