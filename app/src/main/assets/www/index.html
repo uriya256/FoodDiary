@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>יומן אוכל</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="bg" aria-hidden="true"></div>
+<div id="bgDim" aria-hidden="true"></div>
+
+<div id="app">
+  <main id="screen" tabindex="-1"></main>
+  <nav id="tabs" aria-label="ניווט ראשי"></nav>
+</div>
+
+<div id="sheets"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<input type="date" id="datePicker" aria-label="בחירת תאריך" tabindex="-1">
+
+<script src="foods.js"></script>
+<script src="parser.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
