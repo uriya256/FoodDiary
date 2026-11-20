@@ -48,9 +48,9 @@ class MainActivity : ComponentActivity() {
         if (uri == null || content == null) return
         try {
             contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray(Charsets.UTF_8)) }
-            js("window.appToast && window.appToast('הקובץ נשמר')")
+            js("window.appSaved && window.appSaved(true)")
         } catch (e: Exception) {
-            js("window.appToast && window.appToast('שמירה נכשלה')")
+            js("window.appSaved && window.appSaved(false)")
         }
     }
 

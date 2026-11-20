@@ -14,6 +14,14 @@ class Bridge(private val act: MainActivity) {
     @JavascriptInterface
     fun isApp(): Boolean = true
 
+    private fun en() = prefs.getString("lang", "he") == "en"
+
+    /** "he" or "en": used for notification texts and system dialogs. */
+    @JavascriptInterface
+    fun setLang(lang: String) {
+        prefs.edit().putString("lang", lang).apply()
+    }
+
     @JavascriptInterface
     fun appVersion(): String = try {
         act.packageManager.getPackageInfo(act.packageName, 0).versionName ?: ""
@@ -32,7 +40,7 @@ class Bridge(private val act: MainActivity) {
                 }
             } catch (e: Exception) {
                 act.pendingSave = null
-                toast("לא הצלחתי לפתוח את חלון השמירה")
+                toast(if (en()) "Couldn't open the save dialog" else "לא הצלחתי לפתוח את חלון השמירה")
             }
         }
     }
@@ -44,7 +52,7 @@ class Bridge(private val act: MainActivity) {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, text)
             }
-            try { act.startActivity(Intent.createChooser(send, "שיתוף")) } catch (_: Exception) { }
+            try { act.startActivity(Intent.createChooser(send, if (en()) "Share" else "שיתוף")) } catch (_: Exception) { }
         }
     }
 

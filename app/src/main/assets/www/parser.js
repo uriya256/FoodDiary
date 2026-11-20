@@ -6,8 +6,24 @@
   const { ATTACH_CATS, ATTACH_NAMES, PLURALS, CONSTRUCT, COMPOSITE, NUM_WORDS, UNITS_RAW, AFTER_UNITS, FILLER, normKey } = F;
 
   const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
-  const MEAL_LABELS = { breakfast: 'בוקר', lunch: 'צהריים', dinner: 'ערב', snack: 'ביניים' };
-  const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+  let LANG = 'he';
+  const MEAL_LABELS_HE = { breakfast: 'בוקר', lunch: 'צהריים', dinner: 'ערב', snack: 'ביניים' };
+  const MEAL_LABELS_EN = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snacks' };
+  const WEEKDAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+  const WEEKDAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const MEAL_LABELS = new Proxy({}, { get: (_, k) => (LANG === 'en' ? MEAL_LABELS_EN : MEAL_LABELS_HE)[k] });
+  function setLang(l) { LANG = l === 'en' ? 'en' : 'he'; }
+
+  // English words are mapped onto the same grammar the Hebrew parser uses.
+  const EN_KEY = { and: 'ו', '&': 'ו', with: 'עם', without: '~without', no: '~no', plus: ',' };
+  const EN_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, half: 0.5, quarter: 0.25, couple: 2, few: 3 };
+  const EN_FILLER = new Set(['a', 'an', 'of', 'some', 'the', 'i', 'had', 'ate', 'drank', 'little', 'bit', 'about', 'around', 'approx', 'x']);
+  const EN_UNIT_NAMES = {
+    'פרוסות': ['slices', 'slice'], 'כפות': ['tbsp', 'tbsp'], 'כפיות': ['tsp', 'tsp'], 'חתיכות': ['pieces', 'piece'],
+    'משולשים': ['triangles', 'triangle'], 'כוסות': ['cups', 'cup'], 'ספלים': ['mugs', 'mug'], 'קערות': ['bowls', 'bowl'],
+    'צלחות': ['plates', 'plate'], 'מנות': ['servings', 'serving'], 'יחידות': ['units', 'unit'], 'חופנים': ['handfuls', 'handful'],
+    'קופסאות': ['cans', 'can'], 'בקבוקים': ['bottles', 'bottle'], 'פחיות': ['cans', 'can'], 'גרם': ['g', 'g'], 'ביצים': ['eggs', 'egg'],
+  };
   const SEP = new Set([',', ';', '+', '.', '|', '-', '–', '—', '/']);
 
   const SINGULAR = {};
@@ -21,15 +37,23 @@
 
   function tokenize(text) {
     let s = cleanText(text)
-      .replace(/(\d)([א-ת])/g, '$1 $2')
-      .replace(/([א-ת])(\d)/g, '$1 $2')
+      .replace(/(\d)([א-תa-zA-Z])/g, '$1 $2')
+      .replace(/([א-תa-zA-Z])(\d)/g, '$1 $2')
       .replace(/\b(\d+)\s*\/\s*(\d+)\b/g, (m, a, b) => String(+a / +b))
       .replace(/½/g, ' 0.5 ')
       .replace(/[()[\]{}!?:•*]/g, ' ')
       .replace(/([,;+|\n–—])/g, ' , ')
       .replace(/(\S)\.(\s|$)/g, '$1 , ')
       .replace(/\s-\s/g, ' , ');
-    return s.split(/\s+/).filter(Boolean).map(t => (t === '\n' ? ',' : t));
+    const out = [];
+    for (const t of s.split(/\s+/).filter(Boolean)) {
+      const l = t.toLowerCase();
+      if (EN_KEY[l]) out.push(EN_KEY[l]);
+      else if (EN_NUM[l] != null) out.push(String(EN_NUM[l]));
+      else if (EN_FILLER.has(l)) continue;
+      else out.push(t);
+    }
+    return out;
   }
 
   function stripVav(t) {
@@ -52,7 +76,7 @@
   }
 
   function unitOf(t) {
-    const u = UNITS_RAW[t];
+    const u = UNITS_RAW[t] || UNITS_RAW[t.toLowerCase()];
     if (u && !AFTER_UNITS.has(u[0])) return { unit: u[0], conj: false };
     const s = stripVav(t);
     if (s && UNITS_RAW[s] && !AFTER_UNITS.has(UNITS_RAW[s][0])) return { unit: UNITS_RAW[s][0], conj: true };
@@ -98,8 +122,8 @@
       if (SEP.has(t)) { cur = null; mode = 'normal'; conj = false; adjacent = false; continue; }
       if (t === 'ו') { conj = true; adjacent = false; continue; }
       if (t === 'עם' || t === 'ועם') { if (cur) mode = 'with'; adjacent = false; conj = false; continue; }
-      if (t === 'ללא' || t === 'בלי' || t === 'וללא' || t === 'ובלי') {
-        if (cur) { mode = 'without'; cur.note = (cur.note ? cur.note + ', ' : '') + 'ללא'; }
+      if (t === 'ללא' || t === 'בלי' || t === 'וללא' || t === 'ובלי' || t === '~without' || t === '~no') {
+        if (cur) { mode = 'without'; cur.note = (cur.note ? cur.note + ', ' : '') + (t[0] === '~' ? t.slice(1) : 'ללא'); }
         adjacent = false; continue;
       }
       if (FILLER.has(t)) { adjacent = false; continue; }
@@ -166,6 +190,10 @@
     'בוקר': 'breakfast', 'צהריים': 'lunch', 'צהרים': 'lunch', 'צוהריים': 'lunch', 'צוהרים': 'lunch',
     'ערב': 'dinner', 'ביניים': 'snack', 'בינים': 'snack', 'נשנוש': 'snack', 'נשנושים': 'snack', 'קינוח': 'snack', 'לילה': 'snack',
   };
+  const MEAL_RE_EN = /^(breakfast|brunch|lunch|dinner|supper|snacks?|dessert)(?:\s*[:\-–]\s*|\s+|$)(.*)$/i;
+  const MEAL_MAP_EN = { breakfast: 'breakfast', brunch: 'breakfast', lunch: 'lunch', dinner: 'dinner', supper: 'dinner', snack: 'snack', snacks: 'snack', dessert: 'snack' };
+  const WATER_RE = /^(?:מים|water)\s*[:\-–]\s*(\d+)/i;
+  const NOTES_RE = /^(?:הערות|notes?)\s*[:\-–]\s*(.*)$/i;
   const DATE_RE = /^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?(?!\d)(.*)$/;
 
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -210,34 +238,39 @@
         if (y < 100) y += 2000;
         if (validDate(y, m, d)) {
           newDay(isoDate(y, m, d));
-          const rest = dm[4].replace(/^[\s\-–—,]*(יום\s+)?(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)?[\s\-–—,:]*/, '').trim();
+          const rest = dm[4].replace(/^[\s\-–—,]*(יום\s+)?(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)?[\s\-–—,:]*/i, '').trim();
           if (rest) lines.splice(li + 1, 0, rest);
           continue;
         }
       }
-      const mm = line.match(MEAL_RE);
+      const wm = line.match(WATER_RE);
+      if (wm && day) { day.water = +wm[1]; continue; }
+      const nm = line.match(NOTES_RE);
+      if (nm && day) { day.note = day.note ? day.note + '\n' + nm[1] : nm[1]; continue; }
+      let mm = line.match(MEAL_RE);
+      if (!mm) { const me = line.match(MEAL_RE_EN); if (me) mm = [me[0], 'EN:' + MEAL_MAP_EN[me[1].toLowerCase()], me[2]]; }
       if (mm) {
         if (!day) {
           if (opts.defaultDate) newDay(opts.defaultDate);
-          else { warnings.push({ line, msg: 'ארוחה בלי תאריך לפניה' }); continue; }
+          else { warnings.push({ line, msg: 'meal_no_date' }); continue; }
         }
-        meal = MEAL_MAP[mm[1]];
+        meal = mm[1].startsWith('EN:') ? mm[1].slice(3) : MEAL_MAP[mm[1]];
         const rest = (mm[2] || '').trim();
         if (rest) day.raw[meal] = day.raw[meal] ? day.raw[meal] + ' , ' + rest : rest;
         else if (!day.raw[meal]) day.raw[meal] = '';
         continue;
       }
-      if (/^יום\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)\s*$/.test(line)) continue;
+      if (/^(יום\s+)?(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s*$/i.test(line)) continue;
       if (!day) {
         if (opts.defaultDate) newDay(opts.defaultDate);
-        else { warnings.push({ line, msg: 'שורה לפני התאריך הראשון' }); continue; }
+        else { warnings.push({ line, msg: 'before_date' }); continue; }
       }
       if (!meal) {
         day.note = day.note ? day.note + '\n' + line : line;
-        warnings.push({ line, date: day.date, msg: 'לא זוהתה ארוחה. נשמר כהערה' });
+        warnings.push({ line, date: day.date, msg: 'no_meal' });
         continue;
       }
-      const joiner = /^ו/.test(line) ? ' ' : ' , ';
+      const joiner = /^(ו|and\b)/i.test(line) ? ' ' : ' , ';
       day.raw[meal] = day.raw[meal] ? day.raw[meal] + joiner + line : line;
     }
     // parse each day's meals
@@ -250,41 +283,60 @@
 
   function fmtQty(q) {
     if (q == null) return '';
-    if (q === 0.5) return 'חצי';
-    if (q === 0.25) return 'רבע';
+    if (q === 0.5) return LANG === 'en' ? '½' : 'חצי';
+    if (q === 0.25) return LANG === 'en' ? '¼' : 'רבע';
     return String(Math.round(q * 100) / 100);
   }
 
   function unitLabel(unit, qty) {
     if (!unit) return '';
+    if (LANG === 'en') { const e = EN_UNIT_NAMES[unit]; if (e) return qty === 1 ? e[1] : e[0]; }
     return qty === 1 && SINGULAR[unit] ? SINGULAR[unit] : unit;
+  }
+  function unitName(unit) { return unitLabel(unit, 2); }
+  const isLatin = (x) => /^[A-Za-z]/.test(x || '');
+  function enPlural(name) {
+    if (!isLatin(name) || /s$/i.test(name)) return name;
+    if (/(x|ch|sh|o)$/i.test(name)) return name + 'es';
+    if (/[^aeiou]y$/i.test(name)) return name.slice(0, -1) + 'ies';
+    return name + 's';
+  }
+  function warnText(code) {
+    const T = {
+      meal_no_date: ['ארוחה בלי תאריך לפניה', 'Meal with no date before it'],
+      before_date: ['שורה לפני התאריך הראשון', 'Line before the first date'],
+      no_meal: ['לא זוהתה ארוחה. נשמר כהערה', 'No meal heading. Saved as a note'],
+    }[code];
+    return T ? T[LANG === 'en' ? 1 : 0] : code;
   }
 
   function formatItem(it, opts) {
     opts = opts || {};
     let s;
     const q = fmtQty(it.qty);
+    const en = LANG === 'en';
     if (it.unit && AFTER_UNITS.has(it.unit)) s = `${it.name} ${q} ${unitLabel(it.unit, it.qty)}`.trim();
     else if (it.qty != null && it.unit) {
       const ul = unitLabel(it.unit, it.qty);
-      s = it.qty === 1 ? `${ul} ${it.name}` : `${q} ${CONSTRUCT[ul] || ul} ${it.name}`;
+      if (en) s = `${it.qty === 1 ? '1' : q} ${ul}${ul === 'g' ? '' : ' of'} ${it.name}`;
+      else s = it.qty === 1 ? `${ul} ${it.name}` : `${q} ${CONSTRUCT[ul] || ul} ${it.name}`;
     }
-    else if (it.qty != null && it.qty !== 1) s = `${q} ${(it.qty > 1 && PLURALS[it.name]) || it.name}`;
+    else if (it.qty != null && it.qty !== 1) s = `${q} ${(it.qty > 1 && (PLURALS[it.name] || (isLatin(it.name) ? enPlural(it.name) : null))) || it.name}`;
     else s = it.name;
     if (!opts.short) {
-      if (it.with && it.with.length) s += ' עם ' + joinVav(it.with);
+      if (it.with && it.with.length) s += (en ? ' with ' : ' עם ') + joinVav(it.with);
       if (it.note) s += ' ' + it.note;
     }
     return s.replace(/\s+/g, ' ').trim();
   }
 
   function joinVav(list) {
-    return list.join(' ו');
+    return list.join(LANG === 'en' ? ' and ' : ' ו');
   }
 
   function weekdayName(iso) {
     const [y, m, d] = iso.split('-').map(Number);
-    return WEEKDAYS[new Date(y, m - 1, d).getDay()];
+    return (LANG === 'en' ? WEEKDAYS_EN : WEEKDAYS_HE)[new Date(y, m - 1, d).getDay()];
   }
   function displayDate(iso) {
     const [y, m, d] = iso.split('-');
@@ -292,7 +344,8 @@
   }
 
   function dayToText(iso, day) {
-    const out = [`${displayDate(iso)} - יום ${weekdayName(iso)}`];
+    const en = LANG === 'en';
+    const out = [`${displayDate(iso)} - ${en ? '' : 'יום '}${weekdayName(iso)}`];
     for (const k of MEALS) {
       const items = (day.meals && day.meals[k]) || [];
       if (!items.length && !(day.mealNotes && day.mealNotes[k])) continue;
@@ -300,12 +353,12 @@
       if (day.mealNotes && day.mealNotes[k]) line += ` (${day.mealNotes[k]})`;
       out.push(line);
     }
-    if (day.water) out.push(`• מים: ${day.water} כוסות`);
-    if (day.note) out.push(`• הערות: ${day.note}`);
+    if (day.water) out.push(en ? `• Water: ${day.water} glasses` : `• מים: ${day.water} כוסות`);
+    if (day.note) out.push(en ? `• Notes: ${day.note}` : `• הערות: ${day.note}`);
     return out.join('\n');
   }
 
-  const api = { joinVav, MEALS, MEAL_LABELS, WEEKDAYS, tokenize, parseItems, parseDiary, formatItem, fmtQty, unitLabel, dayToText, weekdayName, displayDate, isoDate };
+  const api = { setLang, unitName, warnText, joinVav, MEALS, MEAL_LABELS, tokenize, parseItems, parseDiary, formatItem, fmtQty, unitLabel, dayToText, weekdayName, displayDate, isoDate };
   if (typeof module !== 'undefined') module.exports = api;
   else root.Parser = api;
 })(typeof window !== 'undefined' ? window : globalThis);

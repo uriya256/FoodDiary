@@ -44,21 +44,25 @@ object Reminders {
         val meals = if (prefs.getString("status_date", "") == today()) prefs.getInt("status_meals", 0) else 0
         if (meals >= 4) return
 
+        val en = prefs.getString("lang", "he") == "en"
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "תזכורת יומית", NotificationManager.IMPORTANCE_DEFAULT)
+                NotificationChannel(CHANNEL, if (en) "Daily reminder" else "תזכורת יומית", NotificationManager.IMPORTANCE_DEFAULT)
             )
         }
         val open = PendingIntent.getActivity(
             ctx, 2, Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val text = if (meals == 0) "עוד לא רשמת מה אכלת היום"
-        else "רשמת $meals מתוך 4 ארוחות היום. רוצה להשלים?"
+        val text = if (en) {
+            if (meals == 0) "You haven't logged what you ate today" else "You logged $meals of 4 meals today. Want to finish?"
+        } else {
+            if (meals == 0) "עוד לא רשמת מה אכלת היום" else "רשמת $meals מתוך 4 ארוחות היום. רוצה להשלים?"
+        }
         val n = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_food)
-            .setContentTitle("יומן אוכל")
+            .setContentTitle(if (en) "Food Diary" else "יומן אוכל")
             .setContentText(text)
             .setContentIntent(open)
             .setAutoCancel(true)

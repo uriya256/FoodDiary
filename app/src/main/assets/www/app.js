@@ -1,17 +1,36 @@
 'use strict';
-/* יומן אוכל — main app */
+/* יומן אוכל / Food Diary — main app */
 
 const P = window.Parser;
 const FD = window.Foods;
 const A = window.Android || null;
 const MEALS = P.MEALS;
+let LANG = 'he';
+function tr(he, en) { return LANG === 'en' ? en : he; }
 const MEAL = {
-  breakfast: { label: 'בוקר', icon: 'sunrise', tint: '#E9862F', grad: 'linear-gradient(135deg,#FFC36B,#FF7A59)' },
-  lunch: { label: 'צהריים', icon: 'sun', tint: '#D9A21B', grad: 'linear-gradient(135deg,#FFE07A,#F5A524)' },
-  dinner: { label: 'ערב', icon: 'moon', tint: '#4F6FB0', grad: 'linear-gradient(135deg,#8E9BFF,#4E5BD0)' },
-  snack: { label: 'ביניים', icon: 'cup', tint: '#2F8F6A', grad: 'linear-gradient(135deg,#5EE0B2,#22997A)' },
+  breakfast: { get label() { return tr('בוקר', 'Breakfast'); }, icon: 'sunrise', tint: '#E9862F', grad: 'linear-gradient(135deg,#FFC36B,#FF7A59)' },
+  lunch: { get label() { return tr('צהריים', 'Lunch'); }, icon: 'sun', tint: '#D9A21B', grad: 'linear-gradient(135deg,#FFE07A,#F5A524)' },
+  dinner: { get label() { return tr('ערב', 'Dinner'); }, icon: 'moon', tint: '#4F6FB0', grad: 'linear-gradient(135deg,#8E9BFF,#4E5BD0)' },
+  snack: { get label() { return tr('ביניים', 'Snacks'); }, icon: 'cup', tint: '#2F8F6A', grad: 'linear-gradient(135deg,#5EE0B2,#22997A)' },
 };
-const MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+const MONTHS_HE = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function monthName(i) { return (LANG === 'en' ? MONTHS_EN : MONTHS_HE)[i]; }
+function plural(n, heOne, heMany, enOne, enMany) { return LANG === 'en' ? (n === 1 ? enOne : enMany) : (n === 1 ? heOne : heMany); }
+function chevPrev() { return LANG === 'en' ? 'chev-l' : 'chev-r'; }
+function chevNext() { return LANG === 'en' ? 'chev-r' : 'chev-l'; }
+function catLabel(c) { const x = FD.CATEGORIES[c] || FD.CATEGORIES.other; return LANG === 'en' ? x.en : x.label; }
+function bgName(b) { return LANG === 'en' ? (b.en || b.name) : b.name; }
+function setLang(l) {
+  LANG = l === 'en' ? 'en' : 'he';
+  P.setLang(LANG);
+  document.documentElement.lang = LANG;
+  document.documentElement.dir = LANG === 'en' ? 'ltr' : 'rtl';
+  document.title = tr('יומן אוכל', 'Food Diary');
+  $('#datePicker').setAttribute('aria-label', tr('בחירת תאריך', 'Pick a date'));
+  $('#tabs').setAttribute('aria-label', tr('ניווט ראשי', 'Main navigation'));
+  try { A && A.setLang && A.setLang(LANG); } catch (e) { }
+}
 const ACCENTS = ['#2F7D4F', '#2C7F9A', '#4F5FC0', '#8A4FB0', '#C2456E', '#C0581F', '#8A6A1F', '#3F4B45'];
 const STORE_KEY = 'fooddiary.v1';
 
@@ -56,6 +75,7 @@ const IC = {
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   sparkle: '<path class="d" d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15.5v4M17 17.5h4"/>',
   dice: '<rect class="d" x="4" y="4" width="16" height="16" rx="4.5"/><rect x="4" y="4" width="16" height="16" rx="4.5"/><g fill="currentColor" stroke="none"><circle cx="9" cy="9" r="1.4"/><circle cx="15" cy="15" r="1.4"/><circle cx="15" cy="9" r="1.4"/><circle cx="9" cy="15" r="1.4"/><circle cx="12" cy="12" r="1.4"/></g>',
+  globe: '<circle class="d" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/>',
   file: '<path class="d" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
 };
 function icon(name, size = 22, extra = '') {
@@ -75,8 +95,8 @@ function isoOf(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 function todayISO() { return isoOf(new Date()); }
 function parseISO(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); }
 function addDays(iso, n) { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoOf(d); }
-function longDate(iso) { const d = parseISO(iso); return `${d.getDate()} ב${MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
-function shortDate(iso) { const d = parseISO(iso); return `${d.getDate()} ב${MONTHS[d.getMonth()]}`; }
+function longDate(iso) { const d = parseISO(iso); return tr(`${d.getDate()} ב${monthName(d.getMonth())} ${d.getFullYear()}`, `${monthName(d.getMonth())} ${d.getDate()}, ${d.getFullYear()}`); }
+function shortDate(iso) { const d = parseISO(iso); return tr(`${d.getDate()} ב${monthName(d.getMonth())}`, `${monthName(d.getMonth())} ${d.getDate()}`); }
 function clone(x) { return JSON.parse(JSON.stringify(x)); }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 function nk(s) { return FD.normKey(s); }
@@ -96,6 +116,7 @@ function freshDb() {
     settings: {
       theme: 'auto', accent: '#2F7D4F', bg: 'sage', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false, motion: true,
       showWater: true, waterGoal: 8, reminder: { on: false, h: 21, m: 0 },
+      lang: /^(he|iw)/i.test(navigator.language || 'he') ? 'he' : 'en',
     },
   };
 }
@@ -111,6 +132,7 @@ function loadDb() {
       const f = freshDb();
       db = Object.assign(f, d);
       db.settings = Object.assign(f.settings, d.settings || {});
+      if (!d.settings || !d.settings.lang) db.settings.lang = 'he';
       db.settings.reminder = Object.assign({ on: false, h: 21, m: 0 }, (d.settings || {}).reminder || {});
     } catch (e) { db = freshDb(); }
   }
@@ -118,7 +140,7 @@ function loadDb() {
 const backupLater = debounce(() => { try { A && A.autoBackup && A.autoBackup(JSON.stringify(db)); } catch (e) { } }, 2500);
 function save() {
   invalidate();
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) { toast('האחסון מלא. כדאי לשמור גיבוי'); }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) { toast(tr('האחסון מלא. כדאי לשמור גיבוי', 'Storage is full. Save a backup')); }
   backupLater();
   reportToday();
 }
@@ -347,13 +369,14 @@ function toast(msg, action) {
   toastTimer = setTimeout(() => t.classList.remove('show'), action ? 5000 : 2200);
 }
 window.appToast = (m) => toast(m);
+window.appSaved = (ok) => toast(ok ? tr('הקובץ נשמר', 'File saved') : tr('שמירה נכשלה', 'Saving failed'));
 
 /* ---------------- render: shell ---------------- */
 const TABS = [
-  { id: 'today', label: 'היום', icon: 'book' },
-  { id: 'history', label: 'היסטוריה', icon: 'history' },
-  { id: 'stats', label: 'סיכום', icon: 'chart' },
-  { id: 'settings', label: 'הגדרות', icon: 'gear' },
+  { id: 'today', get label() { return tr('היום', 'Today'); }, icon: 'book' },
+  { id: 'history', get label() { return tr('היסטוריה', 'History'); }, icon: 'history' },
+  { id: 'stats', get label() { return tr('סיכום', 'Summary'); }, icon: 'chart' },
+  { id: 'settings', get label() { return tr('הגדרות', 'Settings'); }, icon: 'gear' },
 ];
 function renderTabs() {
   $('#tabs').innerHTML = TABS.map(t => `<button class="tab" data-act="tab" data-id="${t.id}" ${S.tab === t.id ? 'aria-current="page"' : ''}><span class="pill">${icon(t.icon, 22)}</span>${t.label}</button>`).join('');
@@ -377,7 +400,7 @@ function itemChip(it, meal, idx) {
   const m = main.match(/^(\S+)\s(.+)$/);
   if (it.qty != null && m && !(it.unit && FD.AFTER_UNITS.has(it.unit))) { q = m[1]; name = m[2]; }
   const extra = [];
-  if (it.with && it.with.length) extra.push('עם ' + P.joinVav(it.with));
+  if (it.with && it.with.length) extra.push(tr('עם ', 'with ') + P.joinVav(it.with));
   if (it.note) extra.push(it.note);
   return `<button class="chip" data-act="editItem" data-meal="${meal}" data-idx="${idx}">${q ? `<span class="q">${esc(q)}</span>` : ''}<span>${esc(name)}</span>${extra.length ? `<span class="w">${esc(extra.join(' · '))}</span>` : ''}</button>`;
 }
@@ -393,23 +416,23 @@ function viewToday() {
   const day = getDay(iso, false);
   const isToday = iso === todayISO();
   const st = streak();
-  const wd = 'יום ' + P.weekdayName(iso);
+  const wd = tr('יום ', '') + P.weekdayName(iso);
   let h = `<section class="topbar">
     <div class="daynav">
-      <button class="iconbtn" data-act="prevDay" aria-label="היום הקודם">${icon('chev-r')}</button>
-      <button class="datebtn" data-act="pickDate" aria-label="בחירת תאריך"><span class="wd">${isToday ? 'היום · ' : ''}${wd}</span><span class="dt">${longDate(iso)}</span></button>
-      <button class="iconbtn" data-act="nextDay" aria-label="היום הבא">${icon('chev-l')}</button>
+      <button class="iconbtn" data-act="prevDay" aria-label="${tr('היום הקודם', 'Previous day')}">${icon(chevPrev())}</button>
+      <button class="datebtn" data-act="pickDate" aria-label="${tr('בחירת תאריך', 'Pick a date')}"><span class="wd">${isToday ? tr('היום · ', 'Today · ') : ''}${wd}</span><span class="dt">${longDate(iso)}</span></button>
+      <button class="iconbtn" data-act="nextDay" aria-label="${tr('היום הבא', 'Next day')}">${icon(chevNext())}</button>
     </div>
     <div class="badges">
-      ${st ? `<span class="badge hot">${icon('flame', 17)}רצף ${st} ${st === 1 ? 'יום' : 'ימים'}</span>` : ''}
-      ${!isToday ? `<button class="badge" data-act="goToday">${icon('cal', 16)}חזרה להיום</button>` : ''}
-      <span class="badge">${icon('check', 16)}${mealsCount(day)} מתוך 4 ארוחות</span>
+      ${st ? `<span class="badge hot">${icon('flame', 17)}${tr(`רצף ${st} ${st === 1 ? 'יום' : 'ימים'}`, `${st}-day streak`)}</span>` : ''}
+      ${!isToday ? `<button class="badge" data-act="goToday">${icon('cal', 16)}${tr('חזרה להיום', 'Back to today')}</button>` : ''}
+      <span class="badge">${icon('check', 16)}${tr(`${mealsCount(day)} מתוך 4 ארוחות`, `${mealsCount(day)} of 4 meals`)}</span>
     </div>
   </section>
   <div class="quick">
-    <button class="btn" data-act="copyYesterday"><span class="qi" style="--q1:#7C9BFF;--q2:#5363D6">${icon('copy', 20)}</span>העתק מאתמול</button>
-    <button class="btn" data-act="openImport" data-mode="day"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('paste', 20)}</span>הדבק טקסט</button>
-    <button class="btn" data-act="shareDay"><span class="qi" style="--q1:#5EE0B2;--q2:#1E9C7A">${icon('share', 20)}</span>שתף את היום</button>
+    <button class="btn" data-act="copyYesterday"><span class="qi" style="--q1:#7C9BFF;--q2:#5363D6">${icon('copy', 20)}</span>${tr('העתק מאתמול', 'Copy yesterday')}</button>
+    <button class="btn" data-act="openImport" data-mode="day"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('paste', 20)}</span>${tr('הדבק טקסט', 'Paste text')}</button>
+    <button class="btn" data-act="shareDay"><span class="qi" style="--q1:#5EE0B2;--q2:#1E9C7A">${icon('share', 20)}</span>${tr('שתף את היום', 'Share day')}</button>
   </div>`;
 
   for (const m of MEALS) {
@@ -419,14 +442,14 @@ function viewToday() {
     h += `<section class="card" aria-label="${MEAL[m].label}">
       <div class="meal-head">
         <span class="meal-icon" style="background:${MEAL[m].grad};--glow:${MEAL[m].tint}">${icon(MEAL[m].icon, 24)}</span>
-        <div class="meal-title"><h2>${MEAL[m].label}</h2>${items.length ? `<div class="sub">${items.length} ${items.length === 1 ? 'פריט' : 'פריטים'}</div>` : ''}</div>
-        <button class="iconbtn flat" data-act="mealMenu" data-meal="${m}" aria-label="אפשרויות ל${MEAL[m].label}">${icon('dots')}</button>
-        <button class="iconbtn primary" data-act="openAdd" data-meal="${m}" aria-label="הוספה ל${MEAL[m].label}">${icon('plus')}</button>
+        <div class="meal-title"><h2>${MEAL[m].label}</h2>${items.length ? `<div class="sub">${items.length} ${plural(items.length, 'פריט', 'פריטים', 'item', 'items')}</div>` : ''}</div>
+        <button class="iconbtn flat" data-act="mealMenu" data-meal="${m}" aria-label="${tr(`אפשרויות ל${MEAL[m].label}`, `${MEAL[m].label} options`)}">${icon('dots')}</button>
+        <button class="iconbtn primary" data-act="openAdd" data-meal="${m}" aria-label="${tr(`הוספה ל${MEAL[m].label}`, `Add to ${MEAL[m].label}`)}">${icon('plus')}</button>
       </div>`;
     if (items.length) {
       h += `<div class="chips">${items.map((it, i) => itemChip(it, m, i)).join('')}</div>`;
     } else {
-      h += `<div class="chips">${tpls.slice(0, 3).map(t => `<button class="chip tpl" data-act="applyTpl" data-id="${t.id}" data-meal="${m}">${icon('bookmark', 16)}${esc(t.name)}</button>`).join('')}<button class="chip ghost" data-act="openAdd" data-meal="${m}">${icon('plus', 16)}מה אכלת?</button></div>`;
+      h += `<div class="chips">${tpls.slice(0, 3).map(t => `<button class="chip tpl" data-act="applyTpl" data-id="${t.id}" data-meal="${m}">${icon('bookmark', 16)}${esc(t.name)}</button>`).join('')}<button class="chip ghost" data-act="openAdd" data-meal="${m}">${icon('plus', 16)}${tr('מה אכלת?', 'What did you eat?')}</button></div>`;
     }
     if (note) h += `<div class="meal-note">${icon('note', 16)}<span>${esc(note)}</span></div>`;
     h += `</section>`;
@@ -436,11 +459,11 @@ function viewToday() {
     const w = (day && day.water) || 0;
     const goal = db.settings.waterGoal || 8;
     const n = Math.max(goal, w + (w >= goal ? 1 : 0));
-    h += `<section class="card"><div class="row between"><h2 class="row">${icon('drop', 20, 'style="color:#2C8FB5"')}מים</h2><span class="muted small">${w} מתוך ${goal} כוסות</span></div>
-      <div class="water">${Array.from({ length: n }, (_, i) => `<button class="cup ${i < w ? 'on' : ''}" data-act="water" data-n="${i + 1}" aria-label="${i + 1} כוסות">${icon('glass', 28, i < w ? 'fill="currentColor" fill-opacity=".25"' : '')}</button>`).join('')}</div></section>`;
+    h += `<section class="card"><div class="row between"><h2 class="row">${icon('drop', 20, 'style="color:#2C8FB5"')}${tr('מים', 'Water')}</h2><span class="muted small">${tr(`${w} מתוך ${goal} כוסות`, `${w} of ${goal} glasses`)}</span></div>
+      <div class="water">${Array.from({ length: n }, (_, i) => `<button class="cup ${i < w ? 'on' : ''}" data-act="water" data-n="${i + 1}" aria-label="${i + 1} ${tr('כוסות', 'glasses')}">${icon('glass', 28, i < w ? 'fill="currentColor" fill-opacity=".25"' : '')}</button>`).join('')}</div></section>`;
   }
-  h += `<section class="card"><h3 class="row">${icon('note', 18)}הערות על היום</h3>
-    <textarea class="note" rows="2" data-on="dayNote" placeholder="איך הרגשת, אכלת בחוץ, משהו מיוחד…">${esc((day && day.note) || '')}</textarea></section>`;
+  h += `<section class="card"><h3 class="row">${icon('note', 18)}${tr('הערות על היום', 'Notes for the day')}</h3>
+    <textarea class="note" rows="2" data-on="dayNote" placeholder="${tr('איך הרגשת, אכלת בחוץ, משהו מיוחד…', 'How you felt, ate out, anything special…')}">${esc((day && day.note) || '')}</textarea></section>`;
   return h;
 }
 
@@ -452,13 +475,13 @@ function viewHistory() {
   const first = new Date(yy, mm - 1, 1);
   const daysIn = new Date(yy, mm, 0).getDate();
   const t = todayISO();
-  let cal = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'].map(d => `<div class="h">${d}</div>`).join('');
+  let cal = (LANG === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']).map(d => `<div class="h">${d}</div>`).join('');
   for (let i = 0; i < first.getDay(); i++) cal += '<div></div>';
   for (let d = 1; d <= daysIn; d++) {
     const iso = `${yy}-${pad(mm)}-${pad(d)}`;
     const n = mealsCount(db.days[iso]);
     const cls = [n ? 'l' + n : '', iso === t ? 'today' : '', iso > t ? 'future' : ''].join(' ');
-    cal += `<button class="${cls}" data-act="openDay" data-date="${iso}" aria-label="${d} ב${MONTHS[mm - 1]}${n ? `, ${n} ארוחות` : ''}">${d}</button>`;
+    cal += `<button class="${cls}" data-act="openDay" data-date="${iso}" aria-label="${tr(`${d} ב${monthName(mm - 1)}`, `${monthName(mm - 1)} ${d}`)}${n ? `, ${n} ${tr('ארוחות', 'meals')}` : ''}">${d}</button>`;
   }
   const logged = Object.keys(db.days).filter(k => dayHasData(db.days[k])).sort().reverse();
   let list = logged;
@@ -471,30 +494,30 @@ function viewHistory() {
     const i = s.indexOf(q);
     return i < 0 ? e : esc(s.slice(0, i)) + '<mark>' + esc(q) + '</mark>' + esc(s.slice(i + q.length));
   };
-  let h = `<section class="topbar"><h1>היסטוריה</h1></section>
+  let h = `<section class="topbar"><h1>${tr('היסטוריה', 'History')}</h1></section>
   <section class="card">
     <div class="row between" style="margin-bottom:8px">
-      <button class="iconbtn plain" data-act="histMonth" data-d="-1" aria-label="החודש הקודם">${icon('chev-r')}</button>
-      <h2>${MONTHS[mm - 1]} ${yy}</h2>
-      <button class="iconbtn plain" data-act="histMonth" data-d="1" aria-label="החודש הבא">${icon('chev-l')}</button>
+      <button class="iconbtn plain" data-act="histMonth" data-d="-1" aria-label="${tr('החודש הקודם', 'Previous month')}">${icon(chevPrev())}</button>
+      <h2>${monthName(mm - 1)} ${yy}</h2>
+      <button class="iconbtn plain" data-act="histMonth" data-d="1" aria-label="${tr('החודש הבא', 'Next month')}">${icon(chevNext())}</button>
     </div>
     <div class="cal">${cal}</div>
-    <div class="row small muted" style="margin-top:10px;justify-content:center;gap:12px"><span>כהה יותר = יותר ארוחות רשומות</span></div>
+    <div class="row small muted" style="margin-top:10px;justify-content:center;gap:12px"><span>${tr('כהה יותר = יותר ארוחות רשומות', 'Darker = more meals logged')}</span></div>
   </section>
-  <div class="searchbox" style="margin-bottom:12px">${icon('search', 18)}<input class="search" type="search" data-on="histSearch" value="${esc(q)}" placeholder="חיפוש מאכל, למשל פיצה" aria-label="חיפוש בהיסטוריה"></div>`;
-  if (q) h += `<p class="small muted" style="margin:0 4px 10px">${total ? `נמצא ב-${total} ימים` : 'לא נמצאו ימים'}</p>`;
+  <div class="searchbox" style="margin-bottom:12px">${icon('search', 18)}<input class="search" type="search" data-on="histSearch" value="${esc(q)}" placeholder="${tr('חיפוש מאכל, למשל פיצה', 'Search a food, e.g. pizza')}" aria-label="${tr('חיפוש בהיסטוריה', 'Search history')}"></div>`;
+  if (q) h += `<p class="small muted" style="margin:0 4px 10px">${total ? tr(`נמצא ב-${total} ימים`, `Found on ${total} ${total === 1 ? 'day' : 'days'}`) : tr('לא נמצאו ימים', 'No days found')}</p>`;
   if (!logged.length) {
-    h += `<div class="card empty-state">${icon('history', 40)}<div>עוד אין ימים רשומים.</div><div class="small">אפשר לייבא את כל מה שכבר כתבת.</div><div style="margin-top:12px"><button class="btn primary" data-act="openImport" data-mode="history">${icon('upload')}ייבוא היסטוריה</button></div></div>`;
+    h += `<div class="card empty-state">${icon('history', 40)}<div>${tr('עוד אין ימים רשומים.', 'No days logged yet.')}</div><div class="small">${tr('אפשר לייבא את כל מה שכבר כתבת.', 'You can import everything you already wrote.')}</div><div style="margin-top:12px"><button class="btn primary" data-act="openImport" data-mode="history">${icon('upload')}${tr('ייבוא היסטוריה', 'Import history')}</button></div></div>`;
   }
   for (const iso of list) {
     const d = db.days[iso];
     const lines = MEALS.filter(m => d.meals[m].length).map(m => `<span><b>${MEAL[m].label}:</b> ${hl(d.meals[m].map(it => P.formatItem(it, { short: true })).join(', '))}</span>`);
-    if (d.water) lines.push(`<span><b>מים:</b> ${d.water} כוסות</span>`);
+    if (d.water) lines.push(`<span><b>${tr('מים', 'Water')}:</b> ${d.water} ${tr('כוסות', 'glasses')}</span>`);
     h += `<button class="card dayitem" data-act="openDay" data-date="${iso}">
-      <div class="row between"><span style="font-weight:700">יום ${P.weekdayName(iso)}, ${shortDate(iso)}</span><span class="small muted">${P.displayDate(iso)}</span></div>
+      <div class="row between"><span style="font-weight:700">${tr('יום ', '')}${P.weekdayName(iso)}, ${shortDate(iso)}</span><span class="small muted">${P.displayDate(iso)}</span></div>
       <div class="lines">${lines.join('')}</div></button>`;
   }
-  if (total > list.length) h += `<button class="btn block" data-act="histMore">הצג עוד</button>`;
+  if (total > list.length) h += `<button class="btn block" data-act="histMore">${tr('הצג עוד', 'Show more')}</button>`;
   return h;
 }
 
@@ -532,35 +555,35 @@ function viewStats() {
   }
   const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 10);
   const maxC = top.length ? counts[top[0]] : 1;
-  const rangeSeg = [[7, '7 ימים'], [30, '30 ימים'], [0, 'הכל']].map(([v, l]) => `<button data-act="statsRange" data-v="${v}" aria-pressed="${S.statsRange === v}">${l}</button>`).join('');
-  const mealSeg = [['', 'הכל']].concat(MEALS.map(m => [m, MEAL[m].label])).map(([v, l]) => `<button data-act="statsMeal" data-v="${v}" aria-pressed="${meal === v}">${l}</button>`).join('');
-  let h = `<section class="topbar"><h1>סיכום</h1></section>
+  const rangeSeg = [[7, tr('7 ימים', '7 days')], [30, tr('30 ימים', '30 days')], [0, tr('הכל', 'All')]].map(([v, l]) => `<button data-act="statsRange" data-v="${v}" aria-pressed="${S.statsRange === v}">${l}</button>`).join('');
+  const mealSeg = [['', tr('הכל', 'All')]].concat(MEALS.map(m => [m, MEAL[m].label])).map(([v, l]) => `<button data-act="statsMeal" data-v="${v}" aria-pressed="${meal === v}">${l}</button>`).join('');
+  let h = `<section class="topbar"><h1>${tr('סיכום', 'Summary')}</h1></section>
   <div class="seg" style="margin-bottom:12px">${rangeSeg}</div>`;
   if (!logged.length) {
-    return h + `<div class="card empty-state">${icon('chart', 40)}<div>אין עדיין נתונים בתקופה הזאת.</div></div>`;
+    return h + `<div class="card empty-state">${icon('chart', 40)}<div>${tr('אין עדיין נתונים בתקופה הזאת.', 'No data for this period yet.')}</div></div>`;
   }
   h += `<div class="tiles">
-    <div class="card tile"><div class="big">${logged.length}<span class="small muted"> / ${dates.length}</span></div><div class="lbl">ימים רשומים</div></div>
-    <div class="card tile"><div class="big" style="color:#B85C1E">${streak()}</div><div class="lbl">ימים ברצף</div></div>
-    <div class="card tile"><div class="big">${(mealsTotal / logged.length).toFixed(1)}</div><div class="lbl">ארוחות ביום בממוצע</div></div>
-    <div class="card tile"><div class="big" style="color:#2C8FB5">${waterDays ? (water / waterDays).toFixed(1) : '–'}</div><div class="lbl">כוסות מים ביום</div></div>
+    <div class="card tile"><div class="big">${logged.length}<span class="small muted"> / ${dates.length}</span></div><div class="lbl">${tr('ימים רשומים', 'days logged')}</div></div>
+    <div class="card tile"><div class="big" style="color:#B85C1E">${streak()}</div><div class="lbl">${tr('ימים ברצף', 'day streak')}</div></div>
+    <div class="card tile"><div class="big">${(mealsTotal / logged.length).toFixed(1)}</div><div class="lbl">${tr('ארוחות ביום בממוצע', 'meals per day (avg)')}</div></div>
+    <div class="card tile"><div class="big" style="color:#2C8FB5">${waterDays ? (water / waterDays).toFixed(1) : '–'}</div><div class="lbl">${tr('כוסות מים ביום', 'glasses of water a day')}</div></div>
   </div>
-  <section class="card"><h3>באילו ימים היה…</h3><div class="stack">`;
+  <section class="card"><h3>${tr('באילו ימים היה…', 'Days that included…')}</h3><div class="stack">`;
   const catOrder = Object.keys(FD.CATEGORIES).filter(c => catDays[c]).sort((a, b) => catDays[b] - catDays[a]);
   for (const c of catOrder) {
     const pct = Math.round(catDays[c] / logged.length * 100);
-    h += `<div class="barrow"><div class="row between"><span>${FD.CATEGORIES[c].label}</span><span class="muted small">${catDays[c]} מתוך ${logged.length} ימים</span></div><div class="bar"><i style="width:${pct}%;background:${FD.CATEGORIES[c].color}"></i></div></div>`;
+    h += `<div class="barrow"><div class="row between"><span>${catLabel(c)}</span><span class="muted small">${tr(`${catDays[c]} מתוך ${logged.length} ימים`, `${catDays[c]} of ${logged.length} ${logged.length === 1 ? 'day' : 'days'}`)}</span></div><div class="bar"><i style="width:${pct}%;background:${FD.CATEGORIES[c].color}"></i></div></div>`;
   }
   h += `</div></section>
-  <section class="card"><h3>מה אכלת הכי הרבה</h3><div class="seg" style="margin-bottom:12px">${mealSeg}</div><div class="stack">`;
-  if (!top.length) h += `<div class="muted small">אין פריטים בארוחה הזאת בתקופה.</div>`;
+  <section class="card"><h3>${tr('מה אכלת הכי הרבה', 'What you ate most')}</h3><div class="seg" style="margin-bottom:12px">${mealSeg}</div><div class="stack">`;
+  if (!top.length) h += `<div class="muted small">${tr('אין פריטים בארוחה הזאת בתקופה.', 'Nothing logged for this meal in this period.')}</div>`;
   for (const n of top) {
-    h += `<div class="barrow"><div class="row between"><span>${esc(n)}</span><span class="muted small">${counts[n]} ${counts[n] === 1 ? 'פעם' : 'פעמים'}</span></div><div class="bar"><i style="width:${Math.round(counts[n] / maxC * 100)}%"></i></div></div>`;
+    h += `<div class="barrow"><div class="row between"><span>${esc(n)}</span><span class="muted small">${counts[n]} ${plural(counts[n], 'פעם', 'פעמים', 'time', 'times')}</span></div><div class="bar"><i style="width:${Math.round(counts[n] / maxC * 100)}%"></i></div></div>`;
   }
   h += `</div></section>
   <div class="row" style="gap:8px">
-    <button class="btn grow" data-act="sharePeriod">${icon('share', 18)}שתף כטקסט</button>
-    <button class="btn grow" data-act="exportCsv">${icon('download', 18)}שמור CSV</button>
+    <button class="btn grow" data-act="sharePeriod">${icon('share', 18)}${tr('שתף כטקסט', 'Share as text')}</button>
+    <button class="btn grow" data-act="exportCsv">${icon('download', 18)}${tr('שמור CSV', 'Save CSV')}</button>
   </div>`;
   return h;
 }
@@ -571,77 +594,82 @@ function bgThumbs() {
   const cat = S.bgCat;
   let h = '';
   if (cat === 'all' || cat === 'mine') {
-    h += `<label class="bgthumb add" role="button" aria-label="הוספת רקע מהגלריה">${icon('image', 26)}<span>מהגלריה</span><input type="file" accept="image/*" data-on="addBg" class="hidden"></label>`;
+    h += `<label class="bgthumb add" role="button" aria-label="${tr('הוספת רקע מהגלריה', 'Add a background from gallery')}">${icon('image', 26)}<span>${tr('מהגלריה', 'From gallery')}</span><input type="file" accept="image/*" data-on="addBg" class="hidden"></label>`;
     customBgIds.forEach((id, i) => {
       const sel = s.bg === 'custom:' + id;
-      h += `<button class="bgthumb" style="background-image:url('${bgCache[id]}')" data-act="setBg" data-id="custom:${id}" aria-pressed="${sel}" aria-label="תמונה ${i + 1}">${sel ? `<span class="ck">${icon('check', 16)}</span>` : ''}<span class="nm">תמונה ${i + 1}</span></button>`;
+      h += `<button class="bgthumb" style="background-image:url('${bgCache[id]}')" data-act="setBg" data-id="custom:${id}" aria-pressed="${sel}" aria-label="${tr('תמונה', 'Photo')} ${i + 1}">${sel ? `<span class="ck">${icon('check', 16)}</span>` : ''}<span class="nm">${tr('תמונה', 'Photo')} ${i + 1}</span></button>`;
     });
   }
   for (const b of BUILTIN_BGS) {
     if (cat !== 'all' && b.cat !== cat) continue;
     const style = b.css ? `background:${b.css}` : 'background:var(--page)';
     const sel = s.bg === b.id;
-    h += `<button class="bgthumb" style='${style.replace(/'/g, '&#39;')}' data-act="setBg" data-id="${b.id}" aria-pressed="${sel}" aria-label="רקע ${b.name}">${b.fx ? `<span class="fx" data-fx="${b.fx}">${window.Backgrounds.fxHtml(b.fx)}</span><span class="tag">${icon('sparkle', 12)}מונפש</span>` : ''}${sel ? `<span class="ck">${icon('check', 16)}</span>` : ''}<span class="nm">${b.name}</span></button>`;
+    h += `<button class="bgthumb" style='${style.replace(/'/g, '&#39;')}' data-act="setBg" data-id="${b.id}" aria-pressed="${sel}" aria-label="${tr('רקע', 'Background')} ${bgName(b)}">${b.fx ? `<span class="fx" data-fx="${b.fx}">${window.Backgrounds.fxHtml(b.fx)}</span><span class="tag">${icon('sparkle', 12)}${tr('מונפש', 'Animated')}</span>` : ''}${sel ? `<span class="ck">${icon('check', 16)}</span>` : ''}<span class="nm">${bgName(b)}</span></button>`;
   }
   return h;
 }
 function sw(act, on, label) { return `<button class="switch" role="switch" aria-checked="${!!on}" data-act="${act}" aria-label="${label}"></button>`; }
 function viewSettings() {
   const s = db.settings;
-  const themeSeg = [['light', 'בהיר'], ['dark', 'כהה'], ['auto', 'אוטומטי']].map(([v, l]) => `<button data-act="theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('');
+  const themeSeg = [['light', tr('בהיר', 'Light')], ['dark', tr('כהה', 'Dark')], ['auto', tr('אוטומטי', 'Auto')]].map(([v, l]) => `<button data-act="theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('');
   const r = s.reminder;
   const foodsN = Object.keys(usage()).length;
   const isCustom = (s.bg || '').startsWith('custom:');
-  return `<section class="topbar"><h1>הגדרות</h1></section>
+  const langSeg = [['he', 'עברית'], ['en', 'English']].map(([v, l]) => `<button data-act="lang" data-v="${v}" aria-pressed="${LANG === v}" lang="${v}">${l}</button>`).join('');
+  return `<section class="topbar"><h1>${tr('הגדרות', 'Settings')}</h1></section>
   <section class="card stack">
-    <h2 class="row">${icon('image', 20)}רקע</h2>
-    <div class="bgcats" role="group" aria-label="סוג רקע">${window.Backgrounds.CATS.concat(customBgIds.length ? [['mine', 'התמונות שלי']] : []).map(([v, l]) => `<button data-act="bgCat" data-v="${v}" aria-pressed="${S.bgCat === v}">${l}</button>`).join('')}</div>
+    <h2 class="row">${icon('globe', 20)}${tr('שפה', 'Language')}</h2>
+    <div class="seg">${langSeg}</div>
+  </section>
+  <section class="card stack">
+    <h2 class="row">${icon('image', 20)}${tr('רקע', 'Background')}</h2>
+    <div class="bgcats" role="group" aria-label="${tr('סוג רקע', 'Background type')}">${window.Backgrounds.CATS.map(([v, he, en]) => [v, tr(he, en)]).concat(customBgIds.length ? [['mine', tr('התמונות שלי', 'My photos')]] : []).map(([v, l]) => `<button data-act="bgCat" data-v="${v}" aria-pressed="${S.bgCat === v}">${l}</button>`).join('')}</div>
     <div class="bggrid">${bgThumbs()}</div>
-    <button class="btn soft" data-act="surpriseBg">${icon('dice', 20)}הפתע אותי</button>
-    ${isCustom ? `<button class="btn danger" data-act="delBg">${icon('trash', 18)}מחק את התמונה הנבחרת</button>` : ''}
-    <label class="field"><span>הכהיית הרקע</span><input type="range" min="0" max="0.7" step="0.05" value="${s.dim}" data-on="dim"></label>
-    <label class="field"><span>טשטוש הרקע</span><input type="range" min="0" max="20" step="1" value="${s.blur}" data-on="blur"></label>
-    <label class="field"><span>שקיפות הכרטיסים</span><input type="range" min="0.5" max="1" step="0.02" value="${s.cardAlpha}" data-on="cardAlpha"></label>
-    <div class="row between"><span>הנפשת רקעים</span>${sw('motion', s.motion !== false, 'הנפשת רקעים')}</div>
-    <div class="row between"><span>רקע מתחלף כל יום</span>${sw('rotateBg', s.rotateBg, 'רקע מתחלף כל יום')}</div>
-    <div class="small muted">כשיש תמונות שלך, מתחלפות רק הן. אחרת, הרקעים המובנים.</div>
+    <button class="btn soft" data-act="surpriseBg">${icon('dice', 20)}${tr('הפתע אותי', 'Surprise me')}</button>
+    ${isCustom ? `<button class="btn danger" data-act="delBg">${icon('trash', 18)}${tr('מחק את התמונה הנבחרת', 'Delete selected photo')}</button>` : ''}
+    <label class="field"><span>${tr('הכהיית הרקע', 'Darken background')}</span><input type="range" min="0" max="0.7" step="0.05" value="${s.dim}" data-on="dim"></label>
+    <label class="field"><span>${tr('טשטוש הרקע', 'Blur background')}</span><input type="range" min="0" max="20" step="1" value="${s.blur}" data-on="blur"></label>
+    <label class="field"><span>${tr('שקיפות הכרטיסים', 'Card opacity')}</span><input type="range" min="0.5" max="1" step="0.02" value="${s.cardAlpha}" data-on="cardAlpha"></label>
+    <div class="row between"><span>${tr('הנפשת רקעים', 'Animate backgrounds')}</span>${sw('motion', s.motion !== false, tr('הנפשת רקעים', 'Animate backgrounds'))}</div>
+    <div class="row between"><span>${tr('רקע מתחלף כל יום', 'New background every day')}</span>${sw('rotateBg', s.rotateBg, tr('רקע מתחלף כל יום', 'New background every day'))}</div>
+    <div class="small muted">${tr('כשיש תמונות שלך, מתחלפות רק הן. אחרת, הרקעים המובנים.', 'If you added photos, only they rotate. Otherwise the built-in backgrounds do.')}</div>
   </section>
   <section class="card stack">
-    <h2 class="row">${icon('palette', 20)}מראה</h2>
+    <h2 class="row">${icon('palette', 20)}${tr('מראה', 'Appearance')}</h2>
     <div class="seg">${themeSeg}</div>
-    <div class="field"><span>צבע ראשי</span><div class="swatches">${ACCENTS.map(c => `<button class="swatch" style="background:${c}" data-act="accent" data-v="${c}" aria-pressed="${s.accent === c}" aria-label="צבע ${c}"></button>`).join('')}</div></div>
+    <div class="field"><span>${tr('צבע ראשי', 'Accent color')}</span><div class="swatches">${ACCENTS.map(c => `<button class="swatch" style="background:${c}" data-act="accent" data-v="${c}" aria-pressed="${s.accent === c}" aria-label="${tr('צבע', 'Color')} ${c}"></button>`).join('')}</div></div>
   </section>
   <section class="card stack">
-    <h2 class="row">${icon('bell', 20)}תזכורת יומית</h2>
-    <div class="row between"><span>תזכיר לי אם לא רשמתי את כל הארוחות</span>${sw('reminder', r.on, 'תזכורת יומית')}</div>
-    <label class="field ${r.on ? '' : 'hidden'}"><span>שעה</span><input type="time" value="${pad(r.h)}:${pad(r.m)}" data-on="remTime"></label>
-    ${A ? '' : '<div class="small muted">תזכורות עובדות באפליקציה המותקנת בטלפון.</div>'}
+    <h2 class="row">${icon('bell', 20)}${tr('תזכורת יומית', 'Daily reminder')}</h2>
+    <div class="row between"><span>${tr('תזכיר לי אם לא רשמתי את כל הארוחות', "Remind me if I haven't logged all meals")}</span>${sw('reminder', r.on, tr('תזכורת יומית', 'Daily reminder'))}</div>
+    <label class="field ${r.on ? '' : 'hidden'}"><span>${tr('שעה', 'Time')}</span><input type="time" value="${pad(r.h)}:${pad(r.m)}" data-on="remTime"></label>
+    ${A ? '' : `<div class="small muted">${tr('תזכורות עובדות באפליקציה המותקנת בטלפון.', 'Reminders work in the app installed on your phone.')}</div>`}
   </section>
   <section class="card stack">
-    <h2 class="row">${icon('drop', 20)}מים</h2>
-    <div class="row between"><span>הצג מעקב מים</span>${sw('showWater', s.showWater, 'הצג מעקב מים')}</div>
-    <div class="row between ${s.showWater ? '' : 'hidden'}"><span>יעד כוסות ביום</span>
-      <div class="stepper"><button class="iconbtn plain" data-act="waterGoal" data-d="-1" aria-label="פחות">${icon('minus', 18)}</button><span class="val">${s.waterGoal}</span><button class="iconbtn plain" data-act="waterGoal" data-d="1" aria-label="יותר">${icon('plus', 18)}</button></div></div>
+    <h2 class="row">${icon('drop', 20)}${tr('מים', 'Water')}</h2>
+    <div class="row between"><span>${tr('הצג מעקב מים', 'Show water tracker')}</span>${sw('showWater', s.showWater, tr('הצג מעקב מים', 'Show water tracker'))}</div>
+    <div class="row between ${s.showWater ? '' : 'hidden'}"><span>${tr('יעד כוסות ביום', 'Daily goal (glasses)')}</span>
+      <div class="stepper"><button class="iconbtn plain" data-act="waterGoal" data-d="-1" aria-label="${tr('פחות', 'Less')}">${icon('minus', 18)}</button><span class="val">${s.waterGoal}</span><button class="iconbtn plain" data-act="waterGoal" data-d="1" aria-label="${tr('יותר', 'More')}">${icon('plus', 18)}</button></div></div>
   </section>
   <section class="card">
-    <h2 class="row" style="margin-bottom:4px">${icon('list', 20)}מאכלים וארוחות</h2>
+    <h2 class="row" style="margin-bottom:4px">${icon('list', 20)}${tr('מאכלים וארוחות', 'Foods and meals')}</h2>
     <div class="list">
-      <button class="li" data-act="openFoods"><span class="grow"><span class="t">המאכלים שלי</span><br><span class="s">${foodsN} מאכלים · שינוי שם, איחוד וקטגוריה</span></span>${icon('chev-l', 18)}</button>
-      <button class="li" data-act="openTemplates"><span class="grow"><span class="t">ארוחות שמורות</span><br><span class="s">${db.templates.length ? db.templates.length + ' ארוחות' : 'עוד אין. שומרים מתוך תפריט הארוחה (⋯)'}</span></span>${icon('chev-l', 18)}</button>
+      <button class="li" data-act="openFoods"><span class="grow"><span class="t">${tr('המאכלים שלי', 'My foods')}</span><br><span class="s">${tr(`${foodsN} מאכלים · שינוי שם, איחוד וקטגוריה`, `${foodsN} foods · rename, merge, category`)}</span></span>${icon(chevNext(), 18)}</button>
+      <button class="li" data-act="openTemplates"><span class="grow"><span class="t">${tr('ארוחות שמורות', 'Saved meals')}</span><br><span class="s">${db.templates.length ? db.templates.length + ' ' + tr('ארוחות', 'meals') : tr('עוד אין. שומרים מתוך תפריט הארוחה (⋯)', 'None yet. Save one from a meal’s menu (⋯)')}</span></span>${icon(chevNext(), 18)}</button>
     </div>
   </section>
   <section class="card">
-    <h2 class="row" style="margin-bottom:4px">${icon('file', 20)}נתונים</h2>
+    <h2 class="row" style="margin-bottom:4px">${icon('file', 20)}${tr('נתונים', 'Data')}</h2>
     <div class="list">
-      <button class="li" data-act="openImport" data-mode="history"><span class="grow"><span class="t">ייבוא היסטוריה</span><br><span class="s">מדביקים את כל מה שכבר כתבת, או בוחרים קובץ טקסט</span></span>${icon('upload', 18)}</button>
-      <button class="li" data-act="backup"><span class="grow"><span class="t">שמירת גיבוי</span><br><span class="s">קובץ JSON עם כל הנתונים</span></span>${icon('download', 18)}</button>
-      <label class="li" role="button"><span class="grow"><span class="t">שחזור מגיבוי</span><br><span class="s">טעינת קובץ גיבוי (מחליף את הנתונים)</span></span>${icon('undo', 18)}<input type="file" class="hidden" data-on="restore"></label>
-      <button class="li" data-act="exportText"><span class="grow"><span class="t">ייצוא הכל כטקסט</span><br><span class="s">באותו פורמט שאתה כותב</span></span>${icon('file', 18)}</button>
-      <button class="li" data-act="exportCsv"><span class="grow"><span class="t">ייצוא CSV</span><br><span class="s">לאקסל או לדיאטנית</span></span>${icon('download', 18)}</button>
-      <button class="li" data-act="wipe"><span class="grow"><span class="t" style="color:#B23A3A">מחיקת כל הנתונים</span></span>${icon('trash', 18)}</button>
+      <button class="li" data-act="openImport" data-mode="history"><span class="grow"><span class="t">${tr('ייבוא היסטוריה', 'Import history')}</span><br><span class="s">${tr('מדביקים את כל מה שכבר כתבת, או בוחרים קובץ טקסט', 'Paste everything you already wrote, or pick a text file')}</span></span>${icon('upload', 18)}</button>
+      <button class="li" data-act="backup"><span class="grow"><span class="t">${tr('שמירת גיבוי', 'Save backup')}</span><br><span class="s">${tr('קובץ JSON עם כל הנתונים', 'A JSON file with all your data')}</span></span>${icon('download', 18)}</button>
+      <label class="li" role="button"><span class="grow"><span class="t">${tr('שחזור מגיבוי', 'Restore from backup')}</span><br><span class="s">${tr('טעינת קובץ גיבוי (מחליף את הנתונים)', 'Load a backup file (replaces your data)')}</span></span>${icon('undo', 18)}<input type="file" class="hidden" data-on="restore"></label>
+      <button class="li" data-act="exportText"><span class="grow"><span class="t">${tr('ייצוא הכל כטקסט', 'Export all as text')}</span><br><span class="s">${tr('באותו פורמט שאתה כותב', 'In the same format you write')}</span></span>${icon('file', 18)}</button>
+      <button class="li" data-act="exportCsv"><span class="grow"><span class="t">${tr('ייצוא CSV', 'Export CSV')}</span><br><span class="s">${tr('לאקסל או לדיאטנית', 'For Excel or your dietitian')}</span></span>${icon('download', 18)}</button>
+      <button class="li" data-act="wipe"><span class="grow"><span class="t" style="color:#B23A3A">${tr('מחיקת כל הנתונים', 'Delete all data')}</span></span>${icon('trash', 18)}</button>
     </div>
   </section>
-  <p class="center small muted">יומן אוכל ${A && A.appVersion ? esc(A.appVersion()) : ''} · עובד בלי אינטרנט · הנתונים נשמרים רק בטלפון</p>`;
+  <p class="center small muted">${tr('יומן אוכל', 'Food Diary')} ${A && A.appVersion ? esc(A.appVersion()) : ''} · ${tr('עובד בלי אינטרנט · הנתונים נשמרים רק בטלפון', 'Works offline · your data stays on your phone')}</p>`;
 }
 
 /* ---------------- sheets ---------------- */
@@ -665,7 +693,7 @@ function closeSheet() {
   return true;
 }
 function sheetHead(title, extra = '') {
-  return `<header><h2>${title}</h2>${extra}<button class="iconbtn plain" data-act="closeSheet" aria-label="סגירה">${icon('x', 20)}</button></header>`;
+  return `<header><h2>${title}</h2>${extra}<button class="iconbtn plain" data-act="closeSheet" aria-label="${tr('סגירה', 'Close')}">${icon('x', 20)}</button></header>`;
 }
 function replaceSheetBody(id, html) {
   const s = sheetStack.find(x => x.id === id);
@@ -680,7 +708,7 @@ function replaceSheetBody(id, html) {
 const ADD = { meal: 'breakfast', text: '' };
 function openAdd(meal) {
   ADD.meal = meal; ADD.text = '';
-  openSheet('add', addSheetHtml(), { full: true, title: 'הוספה', onClose: () => { flushAddText(); render({ keepScroll: true }); } });
+  openSheet('add', addSheetHtml(), { full: true, title: tr('הוספה', 'Add'), onClose: () => { flushAddText(); render({ keepScroll: true }); } });
   setTimeout(() => { const i = $('[data-on="addText"]'); i && i.focus(); }, 300);
 }
 // Whatever is still typed in the box when the sheet closes is added too, so nothing is lost.
@@ -701,24 +729,24 @@ function addSheetHtml() {
   let freq = topFoods(m, 14);
   if (freq.length < 8) freq = freq.concat(topFoods('', 20).filter(n => !freq.includes(n))).slice(0, 14);
   const u = usage();
-  return sheetHead(`הוספה ל${MEAL[m].label}`) + `<div class="body">
+  return sheetHead(tr(`הוספה ל${MEAL[m].label}`, `Add to ${MEAL[m].label}`)) + `<div class="body">
     <div class="seg">${seg}</div>
     <form class="row" data-form="add" autocomplete="off">
-      <input class="search grow" type="text" data-on="addText" value="${esc(ADD.text)}" placeholder="למשל: 3 אגוזי מלך, קפה עם חלב" aria-label="מה אכלת" enterkeyhint="send" autocomplete="off">
-      <button type="submit" class="iconbtn primary" aria-label="הוספה">${icon('plus')}</button>
+      <input class="search grow" type="text" data-on="addText" value="${esc(ADD.text)}" placeholder="${tr('למשל: 3 אגוזי מלך, קפה עם חלב', 'e.g. 3 walnuts, coffee with milk')}" aria-label="${tr('מה אכלת', 'What did you eat')}" enterkeyhint="send" autocomplete="off">
+      <button type="submit" class="iconbtn primary" aria-label="${tr('הוספה', 'Add')}">${icon('plus')}</button>
     </form>
     <div id="addLive">${addLiveHtml()}</div>
-    ${items.length ? `<div class="section-t">ב${MEAL[m].label} עכשיו</div>
-    <div class="list">${items.map((it, i) => `<div class="li"><button class="grow" style="border:none;background:none;text-align:right;padding:0;min-height:44px" data-act="editItem" data-meal="${m}" data-idx="${i}"><span class="t">${esc(P.formatItem(it))}</span></button>
-      <div class="stepper"><button class="iconbtn plain" data-act="qty" data-idx="${i}" data-d="-1" aria-label="פחות ${esc(it.name)}">${icon('minus', 18)}</button><span class="val">${it.qty == null ? '–' : esc(P.fmtQty(it.qty))}</span><button class="iconbtn plain" data-act="qty" data-idx="${i}" data-d="1" aria-label="עוד ${esc(it.name)}">${icon('plus', 18)}</button></div></div>`).join('')}</div>` : ''}
-    ${tpls.length ? `<div class="section-t">ארוחות שמורות</div><div class="chips" style="margin-top:0">${tpls.map(t => `<button class="chip tpl" data-act="applyTpl" data-id="${t.id}" data-meal="${m}">${icon('bookmark', 16)}${esc(t.name)}</button>`).join('')}</div>` : ''}
-    ${freq.length ? `<div class="section-t">נפוצים אצלך</div><div class="chips" style="margin-top:0">${freq.map(n => {
+    ${items.length ? `<div class="section-t">${tr(`ב${MEAL[m].label} עכשיו`, `In ${MEAL[m].label} now`)}</div>
+    <div class="list">${items.map((it, i) => `<div class="li"><button class="grow" style="border:none;background:none;text-align:start;padding:0;min-height:44px" data-act="editItem" data-meal="${m}" data-idx="${i}"><span class="t">${esc(P.formatItem(it))}</span></button>
+      <div class="stepper"><button class="iconbtn plain" data-act="qty" data-idx="${i}" data-d="-1" aria-label="${tr('פחות', 'Less')} ${esc(it.name)}">${icon('minus', 18)}</button><span class="val">${it.qty == null ? '–' : esc(P.fmtQty(it.qty))}</span><button class="iconbtn plain" data-act="qty" data-idx="${i}" data-d="1" aria-label="${tr('עוד', 'More')} ${esc(it.name)}">${icon('plus', 18)}</button></div></div>`).join('')}</div>` : ''}
+    ${tpls.length ? `<div class="section-t">${tr('ארוחות שמורות', 'Saved meals')}</div><div class="chips" style="margin-top:0">${tpls.map(t => `<button class="chip tpl" data-act="applyTpl" data-id="${t.id}" data-meal="${m}">${icon('bookmark', 16)}${esc(t.name)}</button>`).join('')}</div>` : ''}
+    ${freq.length ? `<div class="section-t">${tr('נפוצים אצלך', 'Your frequent foods')}</div><div class="chips" style="margin-top:0">${freq.map(n => {
       const last = u[n] && u[n].last;
       const label = last ? P.formatItem({ name: n, qty: last.qty, unit: last.unit, with: last.with, note: last.note }) : n;
       return `<button class="chip" data-act="quickAdd" data-name="${esc(n)}">${icon('plus', 14)}${esc(label)}</button>`;
-    }).join('')}</div>` : `<div class="small muted">המאכלים שתרשום יופיעו כאן כדי להוסיף אותם בלחיצה.</div>`}
+    }).join('')}</div>` : `<div class="small muted">${tr('המאכלים שתרשום יופיעו כאן כדי להוסיף אותם בלחיצה.', 'Foods you log will show up here for one-tap adding.')}</div>`}
   </div>
-  <footer><button class="btn primary big block" data-act="closeSheet">סיום</button></footer>`;
+  <footer><button class="btn primary big block" data-act="closeSheet">${tr('סיום', 'Done')}</button></footer>`;
 }
 function addLiveHtml() {
   const t = ADD.text.trim();
@@ -727,7 +755,7 @@ function addLiveHtml() {
   const k = nk(t);
   const sugg = allFoodNames().filter(n => nk(n).includes(k) && nk(n) !== k).sort((a, b) => ((usage()[b] || {}).n || 0) - ((usage()[a] || {}).n || 0)).slice(0, 8);
   let h = '';
-  if (parsed.length) h += `<div class="preview"><span class="small muted">יתווסף בלחיצה על + או על "סיום":</span><div class="chips">${parsed.map(it => `<span class="chip sel">${esc(P.formatItem(it))}</span>`).join('')}</div></div>`;
+  if (parsed.length) h += `<div class="preview"><span class="small muted">${tr('יתווסף בלחיצה על + או על "סיום":', 'Will be added when you tap + or "Done":')}</span><div class="chips">${parsed.map(it => `<span class="chip sel">${esc(P.formatItem(it))}</span>`).join('')}</div></div>`;
   if (sugg.length) h += `<div class="chips">${sugg.map(n => `<button class="chip" data-act="quickAdd" data-name="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
   return h;
 }
@@ -737,7 +765,7 @@ function addItemsToMeal(iso, meal, items, quiet) {
   day.meals[meal].push(...added);
   learnFoods(added);
   save();
-  if (!quiet) toast('נוסף: ' + added.map(it => P.formatItem(it, { short: true })).join(', '));
+  if (!quiet) toast(tr('נוסף: ', 'Added: ') + added.map(it => P.formatItem(it, { short: true })).join(', '));
   return added;
 }
 
@@ -747,27 +775,27 @@ function openEdit(meal, idx) {
   const day = getDay(S.date, false);
   if (!day || !day.meals[meal][idx]) return;
   EDIT.meal = meal; EDIT.idx = idx; EDIT.it = clone(day.meals[meal][idx]); EDIT.to = meal;
-  openSheet('edit', editHtml(), { title: 'עריכת פריט' });
+  openSheet('edit', editHtml(), { title: tr('עריכת פריט', 'Edit item') });
 }
 function editHtml() {
   const it = EDIT.it;
-  const units = FD.UNIT_LIST.map(u => `<option value="${u}" ${it.unit === u ? 'selected' : ''}>${u}</option>`).join('');
+  const units = FD.UNIT_LIST.map(u => `<option value="${u}" ${it.unit === u ? 'selected' : ''}>${esc(P.unitName(u))}</option>`).join('');
   const seg = MEALS.map(x => `<button data-act="editTo" data-v="${x}" aria-pressed="${x === EDIT.to}">${MEAL[x].label}</button>`).join('');
-  return sheetHead('עריכת פריט') + `<div class="body">
-    <label class="field"><span>מאכל</span><input type="text" value="${esc(it.name)}" data-on="eName" list="foodNames" autocomplete="off"></label>
+  return sheetHead(tr('עריכת פריט', 'Edit item')) + `<div class="body">
+    <label class="field"><span>${tr('מאכל', 'Food')}</span><input type="text" value="${esc(it.name)}" data-on="eName" list="foodNames" autocomplete="off"></label>
     <datalist id="foodNames">${allFoodNames().slice(0, 400).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <div class="row" style="gap:12px;align-items:flex-end">
-      <div class="field"><span>כמות</span><div class="stepper"><button class="iconbtn plain" data-act="eQty" data-d="-1" aria-label="פחות">${icon('minus', 18)}</button><span class="val" id="eQtyVal">${it.qty == null ? '–' : esc(P.fmtQty(it.qty))}</span><button class="iconbtn plain" data-act="eQty" data-d="1" aria-label="יותר">${icon('plus', 18)}</button></div></div>
-      <label class="field grow"><span>יחידה</span><select data-on="eUnit"><option value="">ללא</option>${units}</select></label>
+      <div class="field"><span>${tr('כמות', 'Amount')}</span><div class="stepper"><button class="iconbtn plain" data-act="eQty" data-d="-1" aria-label="${tr('פחות', 'Less')}">${icon('minus', 18)}</button><span class="val" id="eQtyVal">${it.qty == null ? '–' : esc(P.fmtQty(it.qty))}</span><button class="iconbtn plain" data-act="eQty" data-d="1" aria-label="${tr('יותר', 'More')}">${icon('plus', 18)}</button></div></div>
+      <label class="field grow"><span>${tr('יחידה', 'Unit')}</span><select data-on="eUnit"><option value="">${tr('ללא', 'None')}</option>${units}</select></label>
     </div>
-    <label class="field"><span>עם (מופרד בפסיקים)</span><input type="text" value="${esc((it.with || []).join(', '))}" data-on="eWith" placeholder="למשל: גזר, מלפפון"></label>
-    <label class="field"><span>הערה</span><input type="text" value="${esc(it.note || '')}" data-on="eNote" placeholder="למשל: ללא סוכר"></label>
-    <div class="field"><span>ארוחה</span><div class="seg">${seg}</div></div>
+    <label class="field"><span>${tr('עם (מופרד בפסיקים)', 'With (comma separated)')}</span><input type="text" value="${esc((it.with || []).join(', '))}" data-on="eWith" placeholder="${tr('למשל: גזר, מלפפון', 'e.g. carrot, cucumber')}"></label>
+    <label class="field"><span>${tr('הערה', 'Note')}</span><input type="text" value="${esc(it.note || '')}" data-on="eNote" placeholder="${tr('למשל: ללא סוכר', 'e.g. no sugar')}"></label>
+    <div class="field"><span>${tr('ארוחה', 'Meal')}</span><div class="seg">${seg}</div></div>
   </div>
   <footer>
-    <button class="btn danger" data-act="eDelete">${icon('trash', 18)}מחק</button>
-    <button class="btn" data-act="eDup">${icon('copy', 18)}שכפל</button>
-    <button class="btn primary grow" data-act="eSave">שמירה</button>
+    <button class="btn danger" data-act="eDelete">${icon('trash', 18)}${tr('מחק', 'Delete')}</button>
+    <button class="btn" data-act="eDup">${icon('copy', 18)}${tr('שכפל', 'Duplicate')}</button>
+    <button class="btn primary grow" data-act="eSave">${tr('שמירה', 'Save')}</button>
   </footer>`;
 }
 
@@ -778,14 +806,15 @@ function openMealMenu(meal) {
   const prev = getDay(addDays(S.date, -1), false);
   const prevHas = prev && prev.meals[meal].length;
   openSheet('menu', sheetHead(MEAL[meal].label) + `<div class="body"><div class="list">
-    ${has ? `<button class="li" data-act="saveTpl" data-meal="${meal}">${icon('bookmark')}<span class="grow t">שמור כארוחה קבועה</span></button>` : ''}
-    <button class="li" data-act="copyMealPrev" data-meal="${meal}" ${prevHas ? '' : 'disabled'}>${icon('copy')}<span class="grow"><span class="t">העתק מאתמול</span>${prevHas ? `<br><span class="s">${esc(prev.meals[meal].map(it => P.formatItem(it, { short: true })).join(', '))}</span>` : '<br><span class="s">אתמול לא נרשם</span>'}</span></button>
-    <button class="li" data-act="mealNote" data-meal="${meal}">${icon('note')}<span class="grow t">${day && day.mealNotes[meal] ? 'עריכת הערה' : 'הוספת הערה (שעה, איפה, הרגשה)'}</span></button>
-    ${has ? `<button class="li" data-act="shareMeal" data-meal="${meal}">${icon('share')}<span class="grow t">שתף את הארוחה</span></button>
-    <button class="li" data-act="clearMeal" data-meal="${meal}">${icon('trash')}<span class="grow t" style="color:#B23A3A">נקה את הארוחה</span></button>` : ''}
+    ${has ? `<button class="li" data-act="saveTpl" data-meal="${meal}">${icon('bookmark')}<span class="grow t">${tr('שמור כארוחה קבועה', 'Save as a regular meal')}</span></button>` : ''}
+    <button class="li" data-act="copyMealPrev" data-meal="${meal}" ${prevHas ? '' : 'disabled'}>${icon('copy')}<span class="grow"><span class="t">${tr('העתק מאתמול', 'Copy from yesterday')}</span>${prevHas ? `<br><span class="s">${esc(prev.meals[meal].map(it => P.formatItem(it, { short: true })).join(', '))}</span>` : `<br><span class="s">${tr('אתמול לא נרשם', 'Nothing logged yesterday')}</span>`}</span></button>
+    <button class="li" data-act="mealNote" data-meal="${meal}">${icon('note')}<span class="grow t">${day && day.mealNotes[meal] ? tr('עריכת הערה', 'Edit note') : tr('הוספת הערה (שעה, איפה, הרגשה)', 'Add a note (time, place, how you felt)')}</span></button>
+    ${has ? `<button class="li" data-act="shareMeal" data-meal="${meal}">${icon('share')}<span class="grow t">${tr('שתף את הארוחה', 'Share meal')}</span></button>
+    <button class="li" data-act="clearMeal" data-meal="${meal}">${icon('trash')}<span class="grow t" style="color:#B23A3A">${tr('נקה את הארוחה', 'Clear meal')}</span></button>` : ''}
   </div></div>`, { title: MEAL[meal].label });
 }
-function promptSheet(title, label, value, onOk, okLabel = 'שמירה', multiline = false) {
+function promptSheet(title, label, value, onOk, okLabel, multiline = false) {
+  okLabel = okLabel || tr('שמירה', 'Save');
   openSheet('prompt', sheetHead(title) + `<div class="body"><label class="field"><span>${label}</span>${multiline ? `<textarea rows="3" data-on="promptVal">${esc(value)}</textarea>` : `<input type="text" value="${esc(value)}" data-on="promptVal">`}</label></div>
     <footer><button class="btn primary big block" data-act="promptOk">${okLabel}</button></footer>`, { title });
   PROMPT.fn = onOk;
@@ -794,7 +823,7 @@ function promptSheet(title, label, value, onOk, okLabel = 'שמירה', multilin
 const PROMPT = { fn: null };
 function confirmSheet(title, text, okLabel, onOk, danger = true) {
   openSheet('confirm', sheetHead(title) + `<div class="body"><p style="margin:0">${text}</p></div>
-    <footer><button class="btn grow" data-act="closeSheet">ביטול</button><button class="btn ${danger ? 'danger' : 'primary'} grow" data-act="confirmOk">${okLabel}</button></footer>`, { title });
+    <footer><button class="btn grow" data-act="closeSheet">${tr('ביטול', 'Cancel')}</button><button class="btn ${danger ? 'danger' : 'primary'} grow" data-act="confirmOk">${okLabel}</button></footer>`, { title });
   CONFIRM.fn = onOk;
 }
 const CONFIRM = { fn: null };
@@ -804,7 +833,7 @@ const IMP = { mode: 'history', text: '', result: null, conflict: 'merge', merges
 function openImport(mode, text) {
   IMP.mode = mode; IMP.text = text || ''; IMP.result = null; IMP.merges = {}; IMP.showDays = 20;
   IMP.conflict = mode === 'day' ? 'merge' : 'merge';
-  openSheet('import', importHtml(), { full: true, title: 'ייבוא' });
+  openSheet('import', importHtml(), { full: true, title: tr('ייבוא', 'Import') });
   if (text) runParse();
 }
 function runParse() {
@@ -825,7 +854,7 @@ function runParse() {
     for (const o of pool) {
       if (o === n) continue;
       const on = nk(o);
-      const stem = (s) => s.replace(/(ימ|ות|ה)$/, '');
+      const stem = (s) => s.replace(/(ימ|ות|ה|es|s)$/, '');
       const close = stem(nn) === stem(on) || (nn.length >= 4 && lev(nn, on) === 1);
       if (close && (known.has(o) || (usage()[o] || {}).n || o < n)) { best = o; break; }
     }
@@ -838,36 +867,36 @@ function runParse() {
 function importHtml() {
   const r = IMP.result;
   const isDay = IMP.mode === 'day';
-  let h = sheetHead(isDay ? 'הדבקת טקסט ליום' : 'ייבוא היסטוריה') + `<div class="body">`;
+  let h = sheetHead(isDay ? tr('הדבקת טקסט ליום', 'Paste text for the day') : tr('ייבוא היסטוריה', 'Import history')) + `<div class="body">`;
   if (!r) {
     h += `<p class="small muted" style="margin:0">${isDay
-      ? `הדבק את מה שכתבת על ${longDate(S.date)}. כותרות כמו "בוקר:" ו"ערב:" מחלקות לארוחות.`
-      : 'הדבק את כל הרשומות שכתבת. כל יום מתחיל בשורת תאריך (למשל 23/10/2026), וכל ארוחה בכותרת כמו "בוקר:".'}</p>
-      <textarea class="note" rows="10" data-on="impText" placeholder="23/10/2026 - יום שישי&#10;• בוקר: שלוש פרוסות לחם מלא, חביתה…&#10;• צהריים: …">${esc(IMP.text)}</textarea>
-      <label class="btn" role="button">${icon('file', 18)}בחירת קובץ טקסט<input type="file" accept="text/plain" class="hidden" data-on="impFile"></label>`;
-    h += `</div><footer><button class="btn primary big block" data-act="impParse">ניתוח הטקסט</button></footer>`;
+      ? tr(`הדבק את מה שכתבת על ${longDate(S.date)}. כותרות כמו "בוקר:" ו"ערב:" מחלקות לארוחות.`, `Paste what you wrote for ${longDate(S.date)}. Headings like "Breakfast:" and "Dinner:" split it into meals.`)
+      : tr('הדבק את כל הרשומות שכתבת. כל יום מתחיל בשורת תאריך (למשל 23/10/2026), וכל ארוחה בכותרת כמו "בוקר:".', 'Paste all your entries. Each day starts with a date line (e.g. 23/10/2026), and each meal with a heading like "Breakfast:".')}</p>
+      <textarea class="note" rows="10" data-on="impText" placeholder="${tr('23/10/2026 - יום שישי&#10;• בוקר: שלוש פרוסות לחם מלא, חביתה…&#10;• צהריים: …', '23/10/2026 - Friday&#10;• Breakfast: 2 slices of whole wheat bread, omelette…&#10;• Lunch: …')}">${esc(IMP.text)}</textarea>
+      <label class="btn" role="button">${icon('file', 18)}${tr('בחירת קובץ טקסט', 'Choose a text file')}<input type="file" accept="text/plain" class="hidden" data-on="impFile"></label>`;
+    h += `</div><footer><button class="btn primary big block" data-act="impParse">${tr('ניתוח הטקסט', 'Read the text')}</button></footer>`;
     return h;
   }
   const items = r.days.reduce((s, d) => s + MEALS.reduce((a, m) => a + d.meals[m].length, 0), 0);
   const existing = r.days.filter(d => dayHasData(db.days[d.date])).length;
-  h += `<div class="preview"><b>נמצאו ${r.days.length} ${r.days.length === 1 ? 'יום' : 'ימים'} ו-${items} פריטים</b>${r.newNames.length ? `<br><span class="small">${r.newNames.length} מאכלים חדשים יתווספו לרשימה</span>` : ''}</div>`;
-  if (!r.days.length) h += `<div class="warn">לא נמצאו ימים. ודא שיש שורת תאריך כמו 23/10/2026${isDay ? ' או כותרת ארוחה כמו "בוקר:"' : ''}.</div>`;
+  h += `<div class="preview"><b>${tr(`נמצאו ${r.days.length} ${r.days.length === 1 ? 'יום' : 'ימים'} ו-${items} פריטים`, `Found ${r.days.length} ${r.days.length === 1 ? 'day' : 'days'} and ${items} items`)}</b>${r.newNames.length ? `<br><span class="small">${tr(`${r.newNames.length} מאכלים חדשים יתווספו לרשימה`, `${r.newNames.length} new foods will be added to your list`)}</span>` : ''}</div>`;
+  if (!r.days.length) h += `<div class="warn">${tr('לא נמצאו ימים. ודא שיש שורת תאריך כמו 23/10/2026', 'No days found. Make sure there is a date line like 23/10/2026')}${isDay ? tr(' או כותרת ארוחה כמו "בוקר:"', ' or a meal heading like "Breakfast:"') : ''}.</div>`;
   if (existing && !isDay) {
-    h += `<div class="field"><span>${existing} מהימים כבר קיימים ביומן. מה לעשות איתם?</span><div class="seg">
-      ${[['merge', 'להוסיף'], ['replace', 'להחליף'], ['skip', 'לדלג']].map(([v, l]) => `<button data-act="impConflict" data-v="${v}" aria-pressed="${IMP.conflict === v}">${l}</button>`).join('')}</div></div>`;
+    h += `<div class="field"><span>${tr(`${existing} מהימים כבר קיימים ביומן. מה לעשות איתם?`, `${existing} of these days are already in your diary. What should happen to them?`)}</span><div class="seg">
+      ${[['merge', tr('להוסיף', 'Add')], ['replace', tr('להחליף', 'Replace')], ['skip', tr('לדלג', 'Skip')]].map(([v, l]) => `<button data-act="impConflict" data-v="${v}" aria-pressed="${IMP.conflict === v}">${l}</button>`).join('')}</div></div>`;
   }
   if (r.sugg.length) {
-    h += `<div class="section-t">שמות דומים: לאחד?</div><div class="list">${r.sugg.map(([a, b]) => `<div class="li"><span class="grow"><span class="t">${esc(a)}</span> <span class="muted">←</span> <span class="t">${esc(b)}</span></span>${sw('impMerge" data-name="' + esc(a), IMP.merges[a] != null, 'לאחד ' + esc(a))}</div>`).join('')}</div>`;
+    h += `<div class="section-t">${tr('שמות דומים: לאחד?', 'Similar names: merge?')}</div><div class="list">${r.sugg.map(([a, b]) => `<div class="li"><span class="grow"><span class="t">${esc(a)}</span> <span class="muted">${tr('←', '→')}</span> <span class="t">${esc(b)}</span></span>${sw('impMerge" data-name="' + esc(a), IMP.merges[a] != null, tr('לאחד ', 'Merge ') + esc(a))}</div>`).join('')}</div>`;
   }
   if (r.warnings.length) {
-    h += `<details><summary class="warn">${r.warnings.length} שורות שלא זוהו במלואן</summary><div class="small muted stack" style="margin-top:8px">${r.warnings.slice(0, 30).map(w => `<span>${w.date ? esc(P.displayDate(w.date)) + ': ' : ''}${esc(w.line)} · ${esc(w.msg)}</span>`).join('')}</div></details>`;
+    h += `<details><summary class="warn">${tr(`${r.warnings.length} שורות שלא זוהו במלואן`, `${r.warnings.length} lines not fully recognized`)}</summary><div class="small muted stack" style="margin-top:8px">${r.warnings.slice(0, 30).map(w => `<span>${w.date ? esc(P.displayDate(w.date)) + ': ' : ''}${esc(w.line)} · ${esc(P.warnText(w.msg))}</span>`).join('')}</div></details>`;
   }
-  h += `<div class="section-t">תצוגה מקדימה</div>`;
+  h += `<div class="section-t">${tr('תצוגה מקדימה', 'Preview')}</div>`;
   r.days.slice(0, IMP.showDays).forEach(d => {
     h += `<div class="importday">${esc(P.dayToText(d.date, applyMerges(d)))}${d.note ? '' : ''}</div>`;
   });
-  if (r.days.length > IMP.showDays) h += `<button class="btn" data-act="impMore">הצג עוד ${Math.min(20, r.days.length - IMP.showDays)} ימים</button>`;
-  h += `</div><footer><button class="btn" data-act="impBack">עריכה</button><button class="btn primary big grow" data-act="impGo" ${r.days.length ? '' : 'disabled'}>${icon('check', 20)}ייבוא</button></footer>`;
+  if (r.days.length > IMP.showDays) h += `<button class="btn" data-act="impMore">${tr(`הצג עוד ${Math.min(20, r.days.length - IMP.showDays)} ימים`, `Show ${Math.min(20, r.days.length - IMP.showDays)} more days`)}</button>`;
+  h += `</div><footer><button class="btn" data-act="impBack">${tr('עריכה', 'Edit')}</button><button class="btn primary big grow" data-act="impGo" ${r.days.length ? '' : 'disabled'}>${icon('check', 20)}${tr('ייבוא', 'Import')}</button></footer>`;
   return h;
 }
 function applyMerges(d) {
@@ -900,6 +929,7 @@ function doImport() {
       });
     });
     if (d.note) day.note = day.note ? day.note + '\n' + d.note : d.note;
+    if (d.water && (!day.water || IMP.conflict === 'replace')) day.water = d.water;
     nDays++;
   }
   save();
@@ -909,24 +939,24 @@ function doImport() {
     S.histMonth = last.slice(0, 7);
   }
   render({ keepScroll: true });
-  toast(`יובאו ${nDays} ${nDays === 1 ? 'יום' : 'ימים'} ו-${nItems} פריטים`);
+  toast(tr(`יובאו ${nDays} ${nDays === 1 ? 'יום' : 'ימים'} ו-${nItems} פריטים`, `Imported ${nDays} ${nDays === 1 ? 'day' : 'days'} and ${nItems} items`));
 }
 
 /* ----- foods manager ----- */
 const FOODS = { q: '' };
-function openFoods() { FOODS.q = ''; openSheet('foods', foodsHtml(), { full: true, title: 'המאכלים שלי' }); }
+function openFoods() { FOODS.q = ''; openSheet('foods', foodsHtml(), { full: true, title: tr('המאכלים שלי', 'My foods') }); }
 function foodsHtml() {
   const u = usage();
   const q = nk(FOODS.q);
   const names = Object.keys(u).filter(n => !q || nk(n).includes(q)).sort((a, b) => u[b].n - u[a].n);
-  const catOpts = (sel) => Object.keys(FD.CATEGORIES).map(c => `<option value="${c}" ${sel === c ? 'selected' : ''}>${FD.CATEGORIES[c].label}</option>`).join('');
-  return sheetHead('המאכלים שלי') + `<div class="body">
-    <div class="searchbox">${icon('search', 18)}<input class="search" type="search" data-on="foodsQ" value="${esc(FOODS.q)}" placeholder="חיפוש" aria-label="חיפוש מאכל"></div>
-    <p class="small muted" style="margin:0">לחיצה על שם מאפשרת לשנות אותו או לאחד אותו עם מאכל אחר. כל ההיסטוריה מתעדכנת.</p>
+  const catOpts = (sel) => Object.keys(FD.CATEGORIES).map(c => `<option value="${c}" ${sel === c ? 'selected' : ''}>${catLabel(c)}</option>`).join('');
+  return sheetHead(tr('המאכלים שלי', 'My foods')) + `<div class="body">
+    <div class="searchbox">${icon('search', 18)}<input class="search" type="search" data-on="foodsQ" value="${esc(FOODS.q)}" placeholder="${tr('חיפוש', 'Search')}" aria-label="${tr('חיפוש מאכל', 'Search food')}"></div>
+    <p class="small muted" style="margin:0">${tr('לחיצה על שם מאפשרת לשנות אותו או לאחד אותו עם מאכל אחר. כל ההיסטוריה מתעדכנת.', 'Tap a name to rename it or merge it into another food. All your history updates.')}</p>
     <div class="list" id="foodsList">${names.length ? names.map(n => `<div class="li">
-      <button class="grow" style="border:none;background:none;text-align:right;padding:0;min-height:44px" data-act="renameFood" data-name="${esc(n)}"><span class="t">${esc(n)}</span><br><span class="s">${u[n].n} ${u[n].n === 1 ? 'פעם' : 'פעמים'}</span></button>
-      <select data-on="foodCat" data-name="${esc(n)}" aria-label="קטגוריה של ${esc(n)}" style="max-width:150px;border:1px solid var(--line);border-radius:12px;padding:8px;background:transparent;min-height:44px">${catOpts(catOf(n))}</select>
-    </div>`).join('') : '<div class="muted small" style="padding:12px 0">אין מאכלים עדיין.</div>'}</div>
+      <button class="grow" style="border:none;background:none;text-align:start;padding:0;min-height:44px" data-act="renameFood" data-name="${esc(n)}"><span class="t">${esc(n)}</span><br><span class="s">${u[n].n} ${plural(u[n].n, 'פעם', 'פעמים', 'time', 'times')}</span></button>
+      <select data-on="foodCat" data-name="${esc(n)}" aria-label="${tr('קטגוריה של', 'Category of')} ${esc(n)}" style="max-width:150px;border:1px solid var(--line);border-radius:12px;padding:8px;background:transparent;min-height:44px">${catOpts(catOf(n))}</select>
+    </div>`).join('') : `<div class="muted small" style="padding:12px 0">${tr('אין מאכלים עדיין.', 'No foods yet.')}</div>`}</div>
   </div>`;
 }
 function renameFood(from, to) {
@@ -948,14 +978,14 @@ function renameFood(from, to) {
 }
 
 /* ----- templates ----- */
-function openTemplates() { openSheet('tpls', tplsHtml(), { title: 'ארוחות שמורות' }); }
+function openTemplates() { openSheet('tpls', tplsHtml(), { title: tr('ארוחות שמורות', 'Saved meals') }); }
 function tplsHtml() {
-  return sheetHead('ארוחות שמורות') + `<div class="body">${db.templates.length ? `<div class="list">${db.templates.map(t => `<div class="li">
+  return sheetHead(tr('ארוחות שמורות', 'Saved meals')) + `<div class="body">${db.templates.length ? `<div class="list">${db.templates.map(t => `<div class="li">
     <span class="meal-icon" style="background:${MEAL[t.meal].grad};--glow:${MEAL[t.meal].tint}">${icon(MEAL[t.meal].icon, 20)}</span>
     <span class="grow"><span class="t">${esc(t.name)}</span><br><span class="s">${esc(t.items.map(it => P.formatItem(it, { short: true })).join(', '))}</span></span>
-    <button class="iconbtn plain" data-act="renameTpl" data-id="${t.id}" aria-label="שינוי שם">${icon('edit', 18)}</button>
-    <button class="iconbtn plain" data-act="delTpl" data-id="${t.id}" aria-label="מחיקה">${icon('trash', 18)}</button></div>`).join('')}</div>`
-    : `<div class="empty-state">${icon('bookmark', 36)}<div>אין ארוחות שמורות.</div><div class="small">במסך היום, בכפתור ⋯ של ארוחה, בוחרים "שמור כארוחה קבועה".</div></div>`}</div>`;
+    <button class="iconbtn plain" data-act="renameTpl" data-id="${t.id}" aria-label="${tr('שינוי שם', 'Rename')}">${icon('edit', 18)}</button>
+    <button class="iconbtn plain" data-act="delTpl" data-id="${t.id}" aria-label="${tr('מחיקה', 'Delete')}">${icon('trash', 18)}</button></div>`).join('')}</div>`
+    : `<div class="empty-state">${icon('bookmark', 36)}<div>${tr('אין ארוחות שמורות.', 'No saved meals.')}</div><div class="small">${tr('במסך היום, בכפתור ⋯ של ארוחה, בוחרים "שמור כארוחה קבועה".', 'On the Today screen, open a meal’s ⋯ menu and choose "Save as a regular meal".')}</div></div>`}</div>`;
 }
 
 /* ---------------- actions ---------------- */
@@ -970,14 +1000,14 @@ function exportFile(name, content, kind) {
 function shareText(text) {
   if (A && A.shareText) { A.shareText(text); return; }
   if (navigator.share) { navigator.share({ text }).catch(() => { }); return; }
-  navigator.clipboard && navigator.clipboard.writeText(text).then(() => toast('הועתק'));
+  navigator.clipboard && navigator.clipboard.writeText(text).then(() => toast(tr('הועתק', 'Copied')));
 }
 function csvOf(dates) {
-  const rows = [['תאריך', 'יום', 'ארוחה', 'מאכל', 'כמות', 'יחידה', 'עם', 'הערה', 'קטגוריה']];
+  const rows = [LANG === 'en' ? ['Date', 'Day', 'Meal', 'Food', 'Amount', 'Unit', 'With', 'Note', 'Category'] : ['תאריך', 'יום', 'ארוחה', 'מאכל', 'כמות', 'יחידה', 'עם', 'הערה', 'קטגוריה']];
   dates.forEach(iso => {
     const d = db.days[iso]; if (!d) return;
-    MEALS.forEach(m => d.meals[m].forEach(it => rows.push([P.displayDate(iso), P.weekdayName(iso), MEAL[m].label, it.name, it.qty == null ? '' : it.qty, it.unit || '', (it.with || []).join(' + '), it.note || '', FD.CATEGORIES[catOf(it.name)].label])));
-    if (d.water) rows.push([P.displayDate(iso), P.weekdayName(iso), 'מים', 'מים', d.water, 'כוסות', '', '', 'שתייה']);
+    MEALS.forEach(m => d.meals[m].forEach(it => rows.push([P.displayDate(iso), P.weekdayName(iso), MEAL[m].label, it.name, it.qty == null ? '' : it.qty, it.unit ? P.unitName(it.unit) : '', (it.with || []).join(' + '), it.note || '', catLabel(catOf(it.name))])));
+    if (d.water) rows.push([P.displayDate(iso), P.weekdayName(iso), tr('מים', 'Water'), tr('מים', 'Water'), d.water, tr('כוסות', 'glasses'), '', '', catLabel('drink')]);
   });
   return '﻿' + rows.map(r => r.map(c => { const s = String(c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
 }
@@ -1028,7 +1058,7 @@ const ACT = {
     if (q <= 0) {
       const snap = snapshotDay(S.date);
       day.meals[ADD.meal].splice(+el.dataset.idx, 1);
-      save(); toast('הפריט הוסר', { label: 'ביטול', fn: () => restoreDay(S.date, snap) });
+      save(); toast(tr('הפריט הוסר', 'Item removed'), { label: tr('ביטול', 'Undo'), fn: () => restoreDay(S.date, snap) });
     } else { it.qty = q; save(); }
     replaceSheetBody('add', addSheetHtml());
   },
@@ -1037,7 +1067,7 @@ const ACT = {
     if (!t) return;
     const meal = el.dataset.meal || t.meal;
     addItemsToMeal(S.date, meal, clone(t.items), true);
-    toast(`נוספה "${t.name}"`);
+    toast(tr(`נוספה "${t.name}"`, `Added "${t.name}"`));
     render({ keepScroll: true }); refreshAdd();
   },
   editItem(el) { openEdit(el.dataset.meal, +el.dataset.idx); },
@@ -1055,7 +1085,7 @@ const ACT = {
     const day = getDay(S.date, true);
     const it = EDIT.it;
     it.name = canonical(it.name || '') || it.name;
-    if (!it.name.trim()) { toast('צריך שם למאכל'); return; }
+    if (!it.name.trim()) { toast(tr('צריך שם למאכל', 'The food needs a name')); return; }
     day.meals[EDIT.meal].splice(EDIT.idx, 1);
     if (EDIT.to === EDIT.meal) day.meals[EDIT.meal].splice(EDIT.idx, 0, it);
     else day.meals[EDIT.to].push(it);
@@ -1068,23 +1098,23 @@ const ACT = {
     day.meals[EDIT.meal].splice(EDIT.idx, 1);
     cleanupDay(S.date);
     save(); closeSheet(); render({ keepScroll: true }); refreshAdd();
-    toast('הפריט נמחק', { label: 'ביטול', fn: () => restoreDay(S.date, snap) });
+    toast(tr('הפריט נמחק', 'Item deleted'), { label: tr('ביטול', 'Undo'), fn: () => restoreDay(S.date, snap) });
   },
   eDup() {
     const day = getDay(S.date, true);
     const copy = newItem(EDIT.it);
     day.meals[EDIT.to].push(copy);
-    save(); closeSheet(); render({ keepScroll: true }); refreshAdd(); toast('שוכפל');
+    save(); closeSheet(); render({ keepScroll: true }); refreshAdd(); toast(tr('שוכפל', 'Duplicated'));
   },
   mealMenu(el) { openMealMenu(el.dataset.meal); },
   saveTpl(el) {
     const meal = el.dataset.meal;
     const day = getDay(S.date, false);
     closeSheet();
-    const def = meal === 'breakfast' ? 'הבוקר הרגיל' : `${MEAL[meal].label} קבוע`;
-    promptSheet('שמירת ארוחה קבועה', 'שם הארוחה', def, (name) => {
+    const def = meal === 'breakfast' ? tr('הבוקר הרגיל', 'My usual breakfast') : tr(`${MEAL[meal].label} קבוע`, `My usual ${MEAL[meal].label.toLowerCase()}`);
+    promptSheet(tr('שמירת ארוחה קבועה', 'Save a regular meal'), tr('שם הארוחה', 'Meal name'), def, (name) => {
       db.templates.push({ id: uid(), name: name || def, meal, items: day.meals[meal].map(it => { const c = clone(it); delete c.id; return c; }) });
-      save(); render({ keepScroll: true }); toast('נשמר. מופיע בהוספה מהירה');
+      save(); render({ keepScroll: true }); toast(tr('נשמר. מופיע בהוספה מהירה', 'Saved. It shows up in quick add'));
     });
   },
   copyMealPrev(el) {
@@ -1095,13 +1125,13 @@ const ACT = {
     const snap = snapshotDay(S.date);
     addItemsToMeal(S.date, m, clone(prev.meals[m]), true);
     render({ keepScroll: true });
-    toast(`הועתק ${MEAL[m].label} מאתמול`, { label: 'ביטול', fn: () => restoreDay(S.date, snap) });
+    toast(tr(`הועתק ${MEAL[m].label} מאתמול`, `Copied ${MEAL[m].label.toLowerCase()} from yesterday`), { label: tr('ביטול', 'Undo'), fn: () => restoreDay(S.date, snap) });
   },
   mealNote(el) {
     const m = el.dataset.meal;
     closeSheet();
     const day = getDay(S.date, false);
-    promptSheet(`הערה ל${MEAL[m].label}`, 'הערה', (day && day.mealNotes[m]) || '', (v) => {
+    promptSheet(tr(`הערה ל${MEAL[m].label}`, `${MEAL[m].label} note`), tr('הערה', 'Note'), (day && day.mealNotes[m]) || '', (v) => {
       const d = getDay(S.date, true);
       if (v) d.mealNotes[m] = v; else delete d.mealNotes[m];
       cleanupDay(S.date); save(); render({ keepScroll: true });
@@ -1117,22 +1147,22 @@ const ACT = {
     const snap = snapshotDay(S.date);
     const d = getDay(S.date, true); d.meals[m] = [];
     cleanupDay(S.date); save(); closeSheet(); render({ keepScroll: true });
-    toast(`${MEAL[m].label} נוקה`, { label: 'ביטול', fn: () => restoreDay(S.date, snap) });
+    toast(tr(`${MEAL[m].label} נוקה`, `${MEAL[m].label} cleared`), { label: tr('ביטול', 'Undo'), fn: () => restoreDay(S.date, snap) });
   },
   copyYesterday() {
     const prev = getDay(addDays(S.date, -1), false);
-    if (!prev || !mealsCount(prev)) { toast('אתמול לא נרשם'); return; }
+    if (!prev || !mealsCount(prev)) { toast(tr('אתמול לא נרשם', 'Nothing logged yesterday')); return; }
     const snap = snapshotDay(S.date);
     const day = getDay(S.date, true);
     let n = 0;
     MEALS.forEach(m => { if (!day.meals[m].length && prev.meals[m].length) { day.meals[m] = clone(prev.meals[m]).map(newItem); n++; } });
-    if (!n) { toast('כל הארוחות כבר מלאות. אפשר להעתיק ארוחה אחת מתפריט ⋯'); return; }
+    if (!n) { toast(tr('כל הארוחות כבר מלאות. אפשר להעתיק ארוחה אחת מתפריט ⋯', 'All meals are already filled. You can copy a single meal from its ⋯ menu')); return; }
     save(); render({ keepScroll: true, anim: false });
-    toast(`הועתקו ${n} ארוחות מאתמול`, { label: 'ביטול', fn: () => restoreDay(S.date, snap) });
+    toast(tr(`הועתקו ${n} ארוחות מאתמול`, `Copied ${n} ${n === 1 ? 'meal' : 'meals'} from yesterday`), { label: tr('ביטול', 'Undo'), fn: () => restoreDay(S.date, snap) });
   },
   shareDay() {
     const d = getDay(S.date, false);
-    if (!dayHasData(d)) { toast('אין עדיין מה לשתף'); return; }
+    if (!dayHasData(d)) { toast(tr('אין עדיין מה לשתף', 'Nothing to share yet')); return; }
     shareText(P.dayToText(S.date, d));
   },
   water(el) {
@@ -1156,8 +1186,8 @@ const ACT = {
   exportText() { exportFile(`food-diary-${todayISO()}.txt`, allDatesSorted().map(i => P.dayToText(i, db.days[i])).join('\n\n'), 'text'); },
   backup() { exportFile(`food-diary-backup-${todayISO()}.json`, JSON.stringify(db, null, 1), 'json'); },
   wipe() {
-    confirmSheet('מחיקת כל הנתונים', 'כל הימים, המאכלים והארוחות השמורות יימחקו. כדאי לשמור גיבוי קודם.', 'מחק הכל', () => {
-      const s = db.settings; db = freshDb(); db.settings = s; save(); render(); toast('הנתונים נמחקו');
+    confirmSheet(tr('מחיקת כל הנתונים', 'Delete all data'), tr('כל הימים, המאכלים והארוחות השמורות יימחקו. כדאי לשמור גיבוי קודם.', 'All days, foods and saved meals will be deleted. Consider saving a backup first.'), tr('מחק הכל', 'Delete all'), () => {
+      const s = db.settings; db = freshDb(); db.settings = s; save(); render(); toast(tr('הנתונים נמחקו', 'Data deleted'));
     });
   },
   theme(el) { db.settings.theme = el.dataset.v; save(); applyTheme(); render({ keepScroll: true }); },
@@ -1165,17 +1195,18 @@ const ACT = {
   setBg(el) { db.settings.bg = el.dataset.id; db.settings.rotateBg = false; save(); applyTheme(); render({ keepScroll: true }); },
   delBg() {
     const id = (db.settings.bg || '').replace('custom:', '');
-    confirmSheet('מחיקת תמונה', 'למחוק את תמונת הרקע הזאת?', 'מחק', async () => {
+    confirmSheet(tr('מחיקת תמונה', 'Delete photo'), tr('למחוק את תמונת הרקע הזאת?', 'Delete this background photo?'), tr('מחק', 'Delete'), async () => {
       await idbDel(id); delete bgCache[id]; await loadCustomBgs();
       db.settings.bg = 'sage'; save(); applyTheme(); render({ keepScroll: true });
     });
   },
   bgCat(el) { S.bgCat = el.dataset.v; render({ keepScroll: true }); },
+  lang(el) { db.settings.lang = el.dataset.v; setLang(db.settings.lang); save(); render({ keepScroll: true }); },
   surpriseBg() {
     const pool = BUILTIN_BGS.filter(b => b.id !== 'plain' && b.id !== db.settings.bg).map(b => b.id).concat(customBgIds.map(i => 'custom:' + i));
     db.settings.bg = pool[Math.floor(Math.random() * pool.length)]; db.settings.rotateBg = false;
     const b = BUILTIN_BGS.find(x => x.id === db.settings.bg);
-    save(); applyTheme(); render({ keepScroll: true }); toast(b ? `רקע: ${b.name}` : 'רקע: תמונה שלך');
+    save(); applyTheme(); render({ keepScroll: true }); toast(b ? `${tr('רקע', 'Background')}: ${bgName(b)}` : tr('רקע: תמונה שלך', 'Background: your photo'));
   },
   motion() { db.settings.motion = db.settings.motion === false; save(); applyTheme(); render({ keepScroll: true }); },
   rotateBg() { db.settings.rotateBg = !db.settings.rotateBg; save(); applyTheme(); render({ keepScroll: true }); },
@@ -1188,28 +1219,28 @@ const ACT = {
       if (r.on && A.requestNotificationPermission) A.requestNotificationPermission();
       A.setReminder(r.on, r.h, r.m);
     }
-    toast(r.on ? `תזכורת כל יום ב-${pad(r.h)}:${pad(r.m)}` : 'התזכורת כובתה');
+    toast(r.on ? tr(`תזכורת כל יום ב-${pad(r.h)}:${pad(r.m)}`, `Reminder every day at ${pad(r.h)}:${pad(r.m)}`) : tr('התזכורת כובתה', 'Reminder turned off'));
   },
   openFoods() { openFoods(); },
   renameFood(el) {
     const from = el.dataset.name;
-    promptSheet('שינוי שם או איחוד', `שם חדש ל"${from}" (שם של מאכל קיים יאחד ביניהם)`, from, (to) => {
-      renameFood(from, to); replaceSheetBody('foods', foodsHtml()); render({ keepScroll: true }); toast('עודכן בכל ההיסטוריה');
+    promptSheet(tr('שינוי שם או איחוד', 'Rename or merge'), tr(`שם חדש ל"${from}" (שם של מאכל קיים יאחד ביניהם)`, `New name for "${from}" (an existing food name merges them)`), from, (to) => {
+      renameFood(from, to); replaceSheetBody('foods', foodsHtml()); render({ keepScroll: true }); toast(tr('עודכן בכל ההיסטוריה', 'Updated across your history'));
     });
   },
   openTemplates() { openTemplates(); },
   renameTpl(el) {
     const t = db.templates.find(x => x.id === el.dataset.id);
-    promptSheet('שינוי שם', 'שם הארוחה', t.name, (v) => { if (v) t.name = v; save(); replaceSheetBody('tpls', tplsHtml()); });
+    promptSheet(tr('שינוי שם', 'Rename'), tr('שם הארוחה', 'Meal name'), t.name, (v) => { if (v) t.name = v; save(); replaceSheetBody('tpls', tplsHtml()); });
   },
   delTpl(el) {
     const i = db.templates.findIndex(x => x.id === el.dataset.id);
     const t = db.templates[i];
     db.templates.splice(i, 1); save(); replaceSheetBody('tpls', tplsHtml()); render({ keepScroll: true });
-    toast('נמחקה', { label: 'ביטול', fn: () => { db.templates.splice(i, 0, t); save(); replaceSheetBody('tpls', tplsHtml()); render({ keepScroll: true }); } });
+    toast(tr('נמחקה', 'Deleted'), { label: tr('ביטול', 'Undo'), fn: () => { db.templates.splice(i, 0, t); save(); replaceSheetBody('tpls', tplsHtml()); render({ keepScroll: true }); } });
   },
   openImport(el) { openImport(el.dataset.mode || 'history'); },
-  impParse() { if (!IMP.text.trim()) { toast('אין טקסט'); return; } runParse(); },
+  impParse() { if (!IMP.text.trim()) { toast(tr('אין טקסט', 'No text')); return; } runParse(); },
   impBack() { IMP.result = null; replaceSheetBody('import', importHtml()); },
   impConflict(el) { IMP.conflict = el.dataset.v; replaceSheetBody('import', importHtml()); },
   impMerge(el) {
@@ -1251,7 +1282,7 @@ const ON = {
   foodCat(el) {
     const n = el.dataset.name;
     db.foods[n] = Object.assign(db.foods[n] || {}, { cat: el.value });
-    save(); toast(`"${n}" עבר ל${FD.CATEGORIES[el.value].label}`);
+    save(); toast(tr(`"${n}" עבר ל${catLabel(el.value)}`, `"${n}" moved to ${catLabel(el.value)}`));
   },
   promptVal() { },
 };
@@ -1260,16 +1291,16 @@ const FILE_ON = {
   async addBg(el) {
     const f = el.files && el.files[0]; if (!f) return;
     try {
-      toast('טוען תמונה…');
+      toast(tr('טוען תמונה…', 'Loading photo…'));
       const { data, lum } = await readImageFile(f);
       const id = uid();
       const ok = await idbPut({ id, data, lum, created: Date.now() });
-      if (!ok) { toast('לא הצלחתי לשמור את התמונה'); return; }
+      if (!ok) { toast(tr('לא הצלחתי לשמור את התמונה', "Couldn't save the photo")); return; }
       bgCache[id] = data; await loadCustomBgs();
       db.settings.bg = 'custom:' + id; db.settings.rotateBg = false;
       if (!db.settings.dim) db.settings.dim = 0.15;
-      save(); await applyTheme(); render({ keepScroll: true }); toast('הרקע עודכן');
-    } catch (e) { toast('לא הצלחתי לקרוא את התמונה'); }
+      save(); await applyTheme(); render({ keepScroll: true }); toast(tr('הרקע עודכן', 'Background updated'));
+    } catch (e) { toast(tr('לא הצלחתי לקרוא את התמונה', "Couldn't read the photo")); }
     el.value = '';
   },
   restore(el) {
@@ -1279,12 +1310,12 @@ const FILE_ON = {
       try {
         const d = JSON.parse(fr.result);
         if (!d || typeof d.days !== 'object') throw new Error('bad');
-        confirmSheet('שחזור מגיבוי', `בגיבוי יש ${Object.keys(d.days).length} ימים. הנתונים הנוכחיים יוחלפו.`, 'שחזר', () => {
+        confirmSheet(tr('שחזור מגיבוי', 'Restore from backup'), tr(`בגיבוי יש ${Object.keys(d.days).length} ימים. הנתונים הנוכחיים יוחלפו.`, `The backup has ${Object.keys(d.days).length} days. Your current data will be replaced.`), tr('שחזר', 'Restore'), () => {
           const f2 = freshDb();
           db = Object.assign(f2, d); db.settings = Object.assign(f2.settings, d.settings || {});
-          save(); applyTheme(); render(); toast('השחזור הושלם');
+          setLang(db.settings.lang); save(); applyTheme(); render(); toast(tr('השחזור הושלם', 'Restore complete'));
         }, false);
-      } catch (e) { toast('הקובץ לא נראה כמו גיבוי של יומן אוכל'); }
+      } catch (e) { toast(tr('הקובץ לא נראה כמו גיבוי של יומן אוכל', "This file doesn't look like a Food Diary backup")); }
     };
     fr.readAsText(f);
     el.value = '';
@@ -1339,7 +1370,7 @@ window.setInsets = (top, bottom) => {
   document.documentElement.style.setProperty('--sab', bottom + 'px');
 };
 window.onSharedText = (text) => { while (sheetStack.length) closeSheet(); setTimeout(() => openImport(/\d{1,2}[\/.]\d{1,2}/.test(text) ? 'history' : 'day', text), 250); };
-window.onNotifPermission = (ok) => { if (!ok) toast('בלי הרשאת התראות התזכורת לא תופיע'); };
+window.onNotifPermission = (ok) => { if (!ok) toast(tr('בלי הרשאת התראות התזכורת לא תופיע', "Without notification permission the reminder won't show")); };
 window.appPause = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); A && A.autoBackup && A.autoBackup(JSON.stringify(db)); } catch (e) { } };
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
@@ -1353,6 +1384,7 @@ document.addEventListener('visibilitychange', () => {
 /* ---------------- start ---------------- */
 (async function start() {
   loadDb();
+  setLang(db.settings.lang);
   S.lastSeen = todayISO();
   await loadCustomBgs();
   await applyTheme();

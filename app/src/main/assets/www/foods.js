@@ -3,19 +3,19 @@
 'use strict';
 
 const CATEGORIES = {
-  veg:     { label: 'ירקות',            color: '#2F7D4F' },
-  fruit:   { label: 'פירות',            color: '#C0581F' },
-  whole:   { label: 'דגנים מלאים',      color: '#8A6A1F' },
-  grain:   { label: 'לחם ומאפים',       color: '#A07A3C' },
-  protein: { label: 'חלבונים',          color: '#B0413E' },
-  legume:  { label: 'קטניות',           color: '#7A5C2E' },
-  dairy:   { label: 'מוצרי חלב',        color: '#3E6FA8' },
-  nuts:    { label: 'אגוזים וזרעים',    color: '#7D5A3C' },
-  sauce:   { label: 'רטבים ותבלינים',   color: '#6B7A3A' },
-  drink:   { label: 'שתייה',            color: '#2C7F9A' },
-  sweet:   { label: 'מתוקים וחטיפים',   color: '#B2497E' },
-  dish:    { label: 'מנות ומזון מהיר',  color: '#8A4FB0' },
-  other:   { label: 'אחר',              color: '#6B746F' },
+  veg:     { label: 'ירקות', en: 'Vegetables',            color: '#2F7D4F' },
+  fruit:   { label: 'פירות', en: 'Fruit',            color: '#C0581F' },
+  whole:   { label: 'דגנים מלאים', en: 'Whole grains',      color: '#8A6A1F' },
+  grain:   { label: 'לחם ומאפים', en: 'Bread & baked goods',       color: '#A07A3C' },
+  protein: { label: 'חלבונים', en: 'Protein',          color: '#B0413E' },
+  legume:  { label: 'קטניות', en: 'Legumes',           color: '#7A5C2E' },
+  dairy:   { label: 'מוצרי חלב', en: 'Dairy',        color: '#3E6FA8' },
+  nuts:    { label: 'אגוזים וזרעים', en: 'Nuts & seeds',    color: '#7D5A3C' },
+  sauce:   { label: 'רטבים ותבלינים', en: 'Sauces & spices',   color: '#6B7A3A' },
+  drink:   { label: 'שתייה', en: 'Drinks',            color: '#2C7F9A' },
+  sweet:   { label: 'מתוקים וחטיפים', en: 'Sweets & snacks',   color: '#B2497E' },
+  dish:    { label: 'מנות ומזון מהיר', en: 'Dishes & fast food',  color: '#8A4FB0' },
+  other:   { label: 'אחר', en: 'Other',              color: '#6B746F' },
 };
 
 const FOOD_LINES = `
@@ -150,13 +150,134 @@ const FOOD_LINES = `
 ג׳חנון|dish|ג'חנון
 כריך|dish|סנדוויץ׳,סנדוויץ',כריכים
 מרק עוף|dish|
+salad|veg|green salad,vegetable salad,veggie salad,side salad
+cucumber|veg|cucumbers
+tomato|veg|tomatoes,cherry tomatoes
+carrot|veg|carrots
+lettuce|veg|
+bell pepper|veg|peppers,pepper,red pepper
+onion|veg|onions
+garlic|veg|
+lemon|veg|lemons,lemon juice
+broccoli|veg|
+cauliflower|veg|
+zucchini|veg|courgette
+eggplant|veg|aubergine
+potato|veg|potatoes,mashed potatoes,baked potato
+sweet potato|veg|sweet potatoes
+mushrooms|veg|mushroom
+corn|veg|
+spinach|veg|
+avocado|veg|avocados
+vegetables|veg|veggies,roasted vegetables,steamed vegetables
+vegetable soup|veg|soup
+apple|fruit|apples
+banana|fruit|bananas
+orange|fruit|oranges,clementine,clementines,tangerine
+date|fruit|dates
+grapes|fruit|grape
+pear|fruit|pears
+peach|fruit|peaches,nectarine
+watermelon|fruit|
+melon|fruit|
+mango|fruit|
+strawberries|fruit|strawberry
+blueberries|fruit|blueberry
+kiwi|fruit|
+dried fruit|fruit|raisins
+quinoa|whole|
+brown rice|whole|
+oatmeal|whole|oats,porridge,rolled oats
+whole wheat bread|whole|whole grain bread,wholemeal bread,whole wheat,multigrain bread,rye bread
+whole wheat pita|whole|
+whole wheat pasta|whole|
+bread|grain|white bread
+challah|grain|
+pita|grain|pitas,pita bread
+roll|grain|rolls,bun,buns
+baguette|grain|
+tortilla|grain|tortillas,wrap,wraps
+crackers|grain|cracker,rice cakes,rice cake
+rice|grain|white rice
+pasta|grain|spaghetti,macaroni,noodles
+couscous|grain|
+toast|grain|toasts
+croissant|grain|croissants
+bagel|grain|bagels
+cereal|grain|cornflakes,granola
+egg|protein|eggs,boiled egg,boiled eggs,hard boiled eggs
+omelette|protein|omelet,scrambled eggs
+fried egg|protein|fried eggs,sunny side up
+shakshuka|protein|
+chicken|protein|chicken breast,chicken thighs,chicken drumsticks,drumsticks,grilled chicken
+schnitzel|protein|
+turkey|protein|turkey breast,pastrami
+beef|protein|steak,ground beef,meat
+meatballs|protein|meatball,kebab
+fish|protein|cod,tilapia,sea bass
+tuna|protein|tuna salad
+salmon|protein|
+hot dogs|protein|hot dog,sausage,sausages
+tofu|protein|
+hummus|legume|houmous
+lentils|legume|lentil soup
+beans|legume|green beans,black beans,kidney beans
+peas|legume|
+chickpeas|legume|garbanzo
+falafel|legume|
+edamame|legume|
+yogurt|dairy|greek yogurt,yoghurt
+cottage cheese|dairy|cream cheese,white cheese,labneh
+cheese|dairy|yellow cheese,cheddar,mozzarella
+feta|dairy|feta cheese
+milk|dairy|
+walnuts|nuts|walnut
+almonds|nuts|almond
+cashews|nuts|cashew
+pistachios|nuts|pistachio
+peanuts|nuts|peanut,peanut butter
+pumpkin seeds|nuts|
+sunflower seeds|nuts|seeds
+chia seeds|nuts|chia
+flax seeds|nuts|flaxseed
+sesame|nuts|sesame seeds
+tahini|sauce|tahini sauce
+olive oil|sauce|oil
+salt|sauce|
+black pepper|sauce|
+ketchup|sauce|
+mayo|sauce|mayonnaise
+mustard|sauce|
+sauce|sauce|tomato sauce
+date syrup|sauce|silan
+honey|sauce|
+jam|sweet|
+water|drink|glass of water,sparkling water,soda water
+tea|drink|green tea,herbal tea
+coffee|drink|latte,cappuccino,espresso,black coffee
+juice|drink|orange juice
+soft drink|drink|cola,coke,soda
+sugar|sweet|
+chocolate|sweet|
+cake|sweet|
+ice cream|sweet|
+cookie|sweet|cookies,biscuit,biscuits
+snack bar|sweet|protein bar,granola bar,energy bar,bar
+chips|sweet|crisps
+waffle|sweet|waffles
+pizza|dish|
+burger|dish|hamburger
+shawarma|dish|
+sushi|dish|
+sandwich|dish|sandwiches
+chicken soup|dish|
 `;
 
 // Which categories can be "inside" another dish after the word "עם" (e.g. סלט ירקות עם גזר).
 const ATTACH_CATS = new Set(['veg', 'sauce']);
 
 // Specific foods that also join a dish after "עם" (קפה עם חלב, תה עם סוכר).
-const ATTACH_NAMES = new Set(['חלב', 'שמנת', 'סוכר', 'דבש', 'סילאן', 'שמן זית', 'לימון', 'שומשום']);
+const ATTACH_NAMES = new Set(['חלב', 'שמנת', 'סוכר', 'דבש', 'סילאן', 'שמן זית', 'לימון', 'שומשום', 'milk', 'sugar', 'honey', 'olive oil', 'lemon', 'sesame', 'date syrup']);
 
 // Plural forms used when showing "3 תמרים" instead of "3 תמר".
 const PLURALS = {
@@ -176,6 +297,8 @@ const COMPOSITE = {
   'חביתה': ['ביצים', 'ביצה'],
   'ביצת עין': ['ביצים', 'ביצה'],
   'שקשוקה': ['ביצים', 'ביצה'],
+  'omelette': ['ביצים', 'ביצה', 'eggs', 'egg'],
+  'shakshuka': ['ביצים', 'ביצה', 'eggs', 'egg'],
 };
 
 const NUM_WORDS = {
@@ -205,10 +328,26 @@ const UNITS_RAW = {
   'פחיות': ['פחיות', 'פחית'], 'פחית': ['פחיות', 'פחית'],
   'גרם': ['גרם', 'גרם'], 'גר': ['גרם', 'גרם'], 'ג׳': ['גרם', 'גרם'],
   'ביצים': ['ביצים', 'ביצה'],
+  // English unit words (stored with the same Hebrew unit keys)
+  'slice': ['פרוסות', 'פרוסה'], 'slices': ['פרוסות', 'פרוסה'],
+  'piece': ['חתיכות', 'חתיכה'], 'pieces': ['חתיכות', 'חתיכה'],
+  'tbsp': ['כפות', 'כף'], 'tablespoon': ['כפות', 'כף'], 'tablespoons': ['כפות', 'כף'], 'spoon': ['כפות', 'כף'], 'spoons': ['כפות', 'כף'], 'spoonful': ['כפות', 'כף'],
+  'tsp': ['כפיות', 'כפית'], 'teaspoon': ['כפיות', 'כפית'], 'teaspoons': ['כפיות', 'כפית'],
+  'triangle': ['משולשים', 'משולש'], 'triangles': ['משולשים', 'משולש'],
+  'cup': ['כוסות', 'כוס'], 'cups': ['כוסות', 'כוס'], 'glass': ['כוסות', 'כוס'], 'glasses': ['כוסות', 'כוס'],
+  'mug': ['ספלים', 'ספל'], 'mugs': ['ספלים', 'ספל'],
+  'bowl': ['קערות', 'קערה'], 'bowls': ['קערות', 'קערה'],
+  'plate': ['צלחות', 'צלחת'], 'plates': ['צלחות', 'צלחת'],
+  'serving': ['מנות', 'מנה'], 'servings': ['מנות', 'מנה'], 'portion': ['מנות', 'מנה'], 'portions': ['מנות', 'מנה'],
+  'handful': ['חופנים', 'חופן'], 'handfuls': ['חופנים', 'חופן'],
+  'can': ['קופסאות', 'קופסה'], 'cans': ['קופסאות', 'קופסה'],
+  'bottle': ['בקבוקים', 'בקבוק'], 'bottles': ['בקבוקים', 'בקבוק'],
+  'g': ['גרם', 'גרם'], 'gr': ['גרם', 'גרם'], 'gram': ['גרם', 'גרם'], 'grams': ['גרם', 'גרם'],
 };
 const UNIT_LIST = ['פרוסות', 'כפות', 'כפיות', 'חתיכות', 'משולשים', 'כוסות', 'ספלים', 'קערות', 'צלחות', 'מנות', 'יחידות', 'חופנים', 'קופסאות', 'בקבוקים', 'פחיות', 'גרם', 'ביצים'];
 // Units written after the food name: "חביתה 2 ביצים"
 const AFTER_UNITS = new Set(['ביצים']);
+for (const k in UNITS_RAW) if (/^[a-z]/.test(k)) UNITS_RAW[k].en = true;
 
 const FILLER = new Set(['שתיית', 'שתייה', 'שתיה', 'אכלתי', 'שתיתי', 'של', 'את', 'גם', 'וגם', 'קצת', 'בערך', 'כ']);
 
@@ -236,7 +375,8 @@ function normKey(s) {
     .replace(/[׳'`]/g, '׳').replace(/[״"]/g, '״')
     .replace(/ך/g, 'כ').replace(/ם/g, 'מ').replace(/ן/g, 'נ').replace(/ף/g, 'פ').replace(/ץ/g, 'צ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .toLowerCase();
 }
 
 const FOODS_API = { ATTACH_NAMES, PLURALS, CONSTRUCT, CATEGORIES, FOOD_LINES, ATTACH_CATS, COMPOSITE, NUM_WORDS, UNITS_RAW, UNIT_LIST, AFTER_UNITS, FILLER, buildDictionary, normKey };
