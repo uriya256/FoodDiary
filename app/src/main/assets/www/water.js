@@ -30,11 +30,17 @@ function migrateWater() {
   if (!s.water) {
     s.water = WATER_DEFAULTS();
     if (s.waterGoal) s.water.goalMl = Math.max(1000, Math.min(5000, s.waterGoal * 250));
+  } else {
+    s.water = Object.assign(WATER_DEFAULTS(), s.water);
   }
   delete s.waterGoal;
   const cup = W().cupMl;
   for (const iso in db.days) {
     const d = db.days[iso];
+    if (!d || typeof d !== 'object') { delete db.days[iso]; continue; }
+    if (d.drinks && !Array.isArray(d.drinks)) d.drinks = [];
+    if (Array.isArray(d.drinks)) d.drinks = d.drinks.filter(x => x && +x.ml > 0).map(x => ({ t: x.t || null, ml: +x.ml }));
+    if (typeof d.water === 'string' && d.water.trim()) d.water = parseFloat(d.water) || 0;
     if (typeof d.water === 'number') {
       if (d.water > 0 && !(d.drinks && d.drinks.length)) d.drinks = [{ t: null, ml: d.water * cup }];
       delete d.water;

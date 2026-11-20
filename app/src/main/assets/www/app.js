@@ -131,16 +131,29 @@ function loadDb() {
   if (!raw && A && A.readAutoBackup) { try { raw = A.readAutoBackup() || null; } catch (e) { } }
   if (raw) {
     try {
-      const d = JSON.parse(raw);
-      const f = freshDb();
-      db = Object.assign(f, d);
-      db.settings = Object.assign(f.settings, d.settings || {});
-      if (!d.settings || !d.settings.lang) db.settings.lang = 'he';
-      if (!d.settings || !d.settings.water) delete db.settings.water;
-      migrateWater();
-      db.settings.reminder = Object.assign({ on: false, h: 21, m: 0 }, (d.settings || {}).reminder || {});
+      db = hydrateDb(JSON.parse(raw));
+      if (!(JSON.parse(raw).settings || {}).lang) db.settings.lang = 'he';
     } catch (e) { db = freshDb(); }
   }
+}
+/** Turns saved or backed-up data into a full, current-format database. */
+function hydrateDb(d) {
+  const f = freshDb();
+  const defaults = f.settings;
+  const out = Object.assign(f, d);
+  const ds = d.settings || {};
+  out.settings = Object.assign({}, defaults, ds);
+  out.settings.reminder = Object.assign({ on: false, h: 21, m: 0 }, ds.reminder || {});
+  if (!ds.water) delete out.settings.water; // let the upgrade below build it from the old "glasses" goal
+  delete out.exportedAt; delete out.app;
+  out.days = out.days || {};
+  out.foods = out.foods || {};
+  out.aliases = out.aliases || {};
+  out.templates = out.templates || [];
+  const prev = db;
+  db = out;
+  try { migrateWater(); } finally { db = prev; }
+  return out;
 }
 const backupLater = debounce(() => { try { A && A.autoBackup && A.autoBackup(JSON.stringify(db)); } catch (e) { } }, 2500);
 function save() {
@@ -1021,6 +1034,63 @@ function tplsHtml() {
     : `<div class="empty-state">${icon('bookmark', 36)}<div>${tr('אין ארוחות שמורות.', 'No saved meals.')}</div><div class="small">${tr('במסך היום, בכפתור ⋯ של ארוחה, בוחרים "שמור כארוחה קבועה".', 'On the Today screen, open a meal’s ⋯ menu and choose "Save as a regular meal".')}</div></div>`}</div>`;
 }
 
+/* ----- restore from a backup file ----- */
+const RESTORE = { data: null };
+function openRestore(d) {
+  RESTORE.data = d;
+  pullPendingWater();
+  const days = Object.keys(d.days || {}).sort();
+  const t = todayISO();
+  const bakDay = (d.days || {})[t];
+  // water in the backup for today: drinks, or old-style glasses
+  const bakWater = bakDay ? ((bakDay.drinks || []).reduce((a, x) => a + (+x.ml || 0), 0) || (typeof bakDay.water === 'number' ? bakDay.water * W().cupMl : 0)) : 0;
+  const curWater = drinksMl(db.days[t]);
+  const made = d.exportedAt ? new Date(d.exportedAt) : null;
+  const madeTxt = made && !isNaN(made) ? `${P.displayDate(isoOf(made))} ${pad(made.getHours())}:${pad(made.getMinutes())}` : tr('לא ידוע', 'unknown');
+  const last = days.length ? P.displayDate(days[days.length - 1]) : '–';
+  openSheet('restore', sheetHead(tr('שחזור מגיבוי', 'Restore from backup')) + `<div class="body">
+    <div class="preview stack" style="gap:6px">
+      <div>${tr('הגיבוי נוצר ב-', 'Backup made on ')}<b>${madeTxt}</b></div>
+      <div>${tr(`${days.length} ימים, האחרון ${last}`, `${days.length} days, latest ${last}`)}</div>
+      <div>${tr('מים היום: בגיבוי', 'Water today: in the backup')} <b>${fmtAmount(bakWater)}</b> · ${tr('עכשיו באפליקציה', 'in the app now')} <b>${fmtAmount(curWater)}</b></div>
+    </div>
+    <p class="small muted" style="margin:0">${tr('"מיזוג" שומר את מה שיש עכשיו ומוסיף מהגיבוי כל מה שחסר: ימים, מאכלים ושתייה. "החלפה" מוחקת את מה שיש ושמה במקומו את הגיבוי.', '"Merge" keeps what is in the app now and adds anything missing from the backup: days, foods and drinks. "Replace" deletes what is here and puts the backup in its place.')}</p>
+  </div>
+  <footer><button class="btn danger" data-act="restoreReplace">${tr('החלפה', 'Replace')}</button><button class="btn primary big grow" data-act="restoreMerge">${icon('merge', 20)}${tr('מיזוג', 'Merge')}</button></footer>`, { title: tr('שחזור מגיבוי', 'Restore from backup') });
+}
+function mergeInto(cur, bak) {
+  for (const iso in bak.days) {
+    const b = bak.days[iso];
+    if (!cur.days[iso] || !dayHasData(cur.days[iso])) { cur.days[iso] = clone(b); continue; }
+    const c = getDay(iso, true);
+    MEALS.forEach(m => {
+      const have = new Set(c.meals[m].map(it => P.formatItem(it)));
+      ((b.meals || {})[m] || []).forEach(it => { if (!have.has(P.formatItem(it))) c.meals[m].push(newItem(it)); });
+    });
+    const keys = new Set((c.drinks || []).map(x => `${x.t}|${x.ml}`));
+    const bd = (b.drinks || []).slice();
+    if (!bd.length && typeof b.water === 'number' && b.water > 0 && !(c.drinks || []).length) bd.push({ t: null, ml: b.water * W().cupMl });
+    bd.forEach(x => { if (!keys.has(`${x.t}|${x.ml}`)) { c.drinks.push({ t: x.t || null, ml: +x.ml }); keys.add(`${x.t}|${x.ml}`); } });
+    if (b.note && b.note !== c.note) c.note = c.note ? (c.note.includes(b.note) ? c.note : c.note + '\n' + b.note) : b.note;
+    Object.keys(b.mealNotes || {}).forEach(m => { if (!c.mealNotes[m]) c.mealNotes[m] = b.mealNotes[m]; });
+  }
+  cur.foods = Object.assign({}, bak.foods || {}, cur.foods);
+  cur.aliases = Object.assign({}, bak.aliases || {}, cur.aliases);
+  const ids = new Set(cur.templates.map(t => t.id));
+  (bak.templates || []).forEach(t => { if (!ids.has(t.id)) cur.templates.push(t); });
+}
+function finishRestore(mode) {
+  const bak = hydrateDb(RESTORE.data);
+  if (mode === 'replace') db = bak;
+  else mergeInto(db, bak);
+  RESTORE.data = null;
+  closeSheet();
+  setLang(db.settings.lang); save(); applyTheme();
+  S.tab = 'today'; S.date = todayISO(); render({ anim: true });
+  const wml = dayWaterMl(db.days[todayISO()]);
+  toast(tr(`השחזור הושלם: ${Object.keys(db.days).length} ימים${wml ? `, היום ${fmtAmount(wml)} מים` : ''}`, `Restore complete: ${Object.keys(db.days).length} days${wml ? `, ${fmtAmount(wml)} of water today` : ''}`));
+}
+
 /* ---------------- actions ---------------- */
 function setDate(iso) { S.date = iso; S.tab = 'today'; render({ anim: true }); }
 function exportFile(name, content, kind) {
@@ -1216,7 +1286,13 @@ const ACT = {
   sharePeriod() { shareText(rangeDates().filter(i => dayHasData(db.days[i])).map(i => dayText(i)).join('\n\n')); },
   exportCsv() { const ds = S.tab === 'stats' ? rangeDates().filter(i => db.days[i]) : allDatesSorted(); exportFile(`food-diary-${todayISO()}.csv`, csvOf(ds), 'csv'); },
   exportText() { exportFile(`food-diary-${todayISO()}.txt`, allDatesSorted().map(i => dayText(i)).join('\n\n'), 'text'); },
-  backup() { exportFile(`food-diary-backup-${todayISO()}.json`, JSON.stringify(db, null, 1), 'json'); },
+  backup() {
+    pullPendingWater();
+    const now = new Date();
+    exportFile(`food-diary-backup-${todayISO()}-${pad(now.getHours())}${pad(now.getMinutes())}.json`, JSON.stringify(Object.assign({ app: 'fooddiary', exportedAt: now.toISOString() }, db), null, 1), 'json');
+  },
+  restoreMerge() { finishRestore('merge'); },
+  restoreReplace() { finishRestore('replace'); },
   wipe() {
     confirmSheet(tr('מחיקת כל הנתונים', 'Delete all data'), tr('כל הימים, המאכלים והארוחות השמורות יימחקו. כדאי לשמור גיבוי קודם.', 'All days, foods and saved meals will be deleted. Consider saving a backup first.'), tr('מחק הכל', 'Delete all'), () => {
       const s = db.settings; db = freshDb(); db.settings = s; save(); render(); toast(tr('הנתונים נמחקו', 'Data deleted'));
@@ -1426,13 +1502,7 @@ const FILE_ON = {
       try {
         const d = JSON.parse(fr.result);
         if (!d || typeof d.days !== 'object') throw new Error('bad');
-        confirmSheet(tr('שחזור מגיבוי', 'Restore from backup'), tr(`בגיבוי יש ${Object.keys(d.days).length} ימים. הנתונים הנוכחיים יוחלפו.`, `The backup has ${Object.keys(d.days).length} days. Your current data will be replaced.`), tr('שחזר', 'Restore'), () => {
-          const f2 = freshDb();
-          db = Object.assign(f2, d); db.settings = Object.assign(f2.settings, d.settings || {});
-          if (!d.settings || !d.settings.water) delete db.settings.water;
-          migrateWater();
-          setLang(db.settings.lang); save(); applyTheme(); render(); toast(tr('השחזור הושלם', 'Restore complete'));
-        }, false);
+        openRestore(d);
       } catch (e) { toast(tr('הקובץ לא נראה כמו גיבוי של יומן אוכל', "This file doesn't look like a Food Diary backup")); }
     };
     fr.readAsText(f);

@@ -11,21 +11,33 @@ android {
         applicationId = "com.uriya.fooddiary"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.6"
+        versionCode = 8
+        versionName = "1.7"
         ndk {
             // phones only: keeps the APK smaller (the OCR engine ships native code per CPU type)
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
     }
 
+    // Every build is signed with the same key (kept by GitHub Actions, not in the repo),
+    // so a new APK installs over the old one and keeps your data.
+    val keyFile = rootProject.file("signing/fooddiary.keystore")
+    signingConfigs {
+        create("fixed") {
+            storeFile = keyFile
+            storePassword = System.getenv("KEYSTORE_PASS") ?: "fooddiary"
+            keyAlias = "fooddiary"
+            keyPassword = System.getenv("KEYSTORE_PASS") ?: "fooddiary"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // signed with the debug key so the release APK installs directly
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keyFile.exists()) signingConfigs.getByName("fixed") else signingConfigs.getByName("debug")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
