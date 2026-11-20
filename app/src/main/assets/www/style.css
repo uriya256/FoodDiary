@@ -315,3 +315,82 @@ html.dark #toast button { color: var(--accent); }
 @keyframes slideDown { from { transform: none; } to { transform: translateY(100%); } }
 @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- animated backgrounds ---------- */
+#bgFx { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; container-type: size; }
+.bgthumb .fx { position: absolute; inset: 0; overflow: hidden; container-type: size; pointer-events: none; border-radius: 14px; }
+.fx i { position: absolute; display: block; will-change: transform; }
+#bgFx i { position: absolute; display: block; will-change: transform; }
+html.still #bgFx i, html.still .bgthumb .fx i { animation-play-state: paused !important; }
+
+.fx-flow { inset: 0; background: linear-gradient(120deg, #FFD1DC, #FFE7C2, #D4F5E2, #CFE6FF, #E5D4FF, #FFD1DC); background-size: 400% 400%; animation: fxFlow 16s ease infinite; }
+@keyframes fxFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+.fx-blob { left: var(--x); top: var(--y); width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); border-radius: 50%;
+  background: radial-gradient(circle, var(--c) 0%, transparent 68%); opacity: .8; animation: fxBlob var(--d) ease-in-out var(--dl) infinite alternate; }
+[data-fx="aurora"] .fx-blob { mix-blend-mode: screen; opacity: .6; height: calc(var(--s) * .5); border-radius: 50% / 40%; }
+@keyframes fxBlob { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(18cqw, -12cqh) scale(1.25); } 100% { transform: translate(-14cqw, 10cqh) scale(.9); } }
+
+.fx-bubble { left: var(--x); bottom: -60px; width: var(--s); height: var(--s); border-radius: 50%; border: 1.5px solid rgba(255,255,255,.95);
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.95) 0 10%, rgba(255,255,255,.18) 32%, rgba(120,190,255,.18) 100%);
+  animation: fxRise var(--d) linear var(--dl) infinite; }
+@keyframes fxRise { 0% { transform: translate(0, 0); } 50% { transform: translate(14px, -55cqh); } 100% { transform: translate(-10px, calc(-100cqh - 90px)); } }
+
+.fx-star { left: var(--x); top: var(--y); width: var(--s); height: var(--s); border-radius: 50%; background: #fff; box-shadow: 0 0 6px #fff;
+  animation: fxTwinkle var(--d) ease-in-out var(--dl) infinite alternate; }
+@keyframes fxTwinkle { from { opacity: .15; transform: scale(.6); } to { opacity: 1; transform: scale(1.15); } }
+.fx-shoot { top: var(--y, 14%); left: 100%; width: 110px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, #fff, transparent);
+  animation: fxShoot 9s ease-in var(--dl, 0s) infinite; opacity: 0; }
+@keyframes fxShoot { 0%, 80% { transform: translate(0, 0) rotate(-22deg); opacity: 0; } 82% { opacity: 1; } 100% { transform: translate(-130cqw, 52cqw) rotate(-22deg); opacity: 0; } }
+
+.fx-flake { left: var(--x); top: -12px; width: var(--s); height: var(--s); border-radius: 50%; background: #fff; opacity: .85; box-shadow: 0 0 4px rgba(255,255,255,.8);
+  animation: fxFall var(--d) linear var(--dl) infinite; }
+@keyframes fxFall { 0% { transform: translate(0, 0); } 25% { transform: translate(var(--sw), 25cqh); } 50% { transform: translate(0, 50cqh); } 75% { transform: translate(calc(var(--sw) * -1), 75cqh); } 100% { transform: translate(0, calc(100cqh + 24px)); } }
+
+.fx-fly { left: var(--x); top: var(--y); width: 5px; height: 5px; border-radius: 50%; background: #FFF6A8; box-shadow: 0 0 10px 3px rgba(255, 228, 92, .55);
+  animation: fxFly var(--d) ease-in-out var(--dl) infinite alternate, fxGlow 2.4s ease-in-out var(--dl) infinite alternate; }
+@keyframes fxFly { to { transform: translate(var(--mx), var(--my)); } }
+@keyframes fxGlow { from { opacity: .15; } to { opacity: 1; } }
+
+.fx-leaf { left: var(--x); top: -40px; width: var(--s); height: var(--s); opacity: .9; animation: fxLeaf var(--d) linear var(--dl) infinite; }
+@keyframes fxLeaf { 0% { transform: translate(0, 0) rotate(0); } 50% { transform: translate(var(--sw), 50cqh) rotate(calc(var(--rot) / 2)); } 100% { transform: translate(calc(var(--sw) * -.5), calc(100cqh + 60px)) rotate(var(--rot)); } }
+
+.fx-fruit { left: var(--x); bottom: -70px; width: var(--s); height: var(--s); opacity: .85; animation: fxFloat var(--d) linear var(--dl) infinite; }
+@keyframes fxFloat { 0% { transform: translate(0, 0) rotate(0); } 50% { transform: translate(22px, -55cqh) rotate(calc(var(--rot) / 2)); } 100% { transform: translate(-12px, calc(-100cqh - 90px)) rotate(var(--rot)); } }
+.fx-leaf svg, .fx-fruit svg { display: block; }
+
+.fx-sun { left: 50%; top: 20%; width: 34cqw; height: 34cqw; margin-left: -17cqw; border-radius: 50%;
+  background: radial-gradient(circle, #FFD27A 0%, #FFB36B 55%, rgba(255,179,107,0) 70%); animation: fxSun 6s ease-in-out infinite alternate; }
+@keyframes fxSun { from { transform: scale(.95); } to { transform: scale(1.08); } }
+.fx-wave { left: 0; bottom: 0; width: 200%; height: var(--h); animation: fxWave var(--wd) linear infinite; }
+.fx-wave svg { display: block; }
+.fx-wave.w0 { --h: 34cqh; --wd: 16s; color: #8ED0E2; opacity: .55; }
+.fx-wave.w1 { --h: 25cqh; --wd: 11s; color: #57B3CE; opacity: .6; animation-direction: reverse; }
+.fx-wave.w2 { --h: 16cqh; --wd: 7s; color: #2C8FB5; opacity: .75; }
+@keyframes fxWave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.bgcats { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.bgcats::-webkit-scrollbar { display: none; }
+.bgcats button { flex-shrink: 0; border: 1px solid var(--line); background: transparent; border-radius: 999px; min-height: 38px; padding: 0 14px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.bgcats button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.bgthumb .tag { position: absolute; top: 6px; right: 6px; height: 22px; padding: 0 7px; border-radius: 11px; background: rgba(0,0,0,.45); color: #fff; font-size: 11px; display: flex; align-items: center; gap: 3px; backdrop-filter: blur(4px); }
+
+/* ---------- modern icons ---------- */
+svg .d { fill: currentColor; fill-opacity: .2; stroke: none; }
+.meal-icon { color: #fff; box-shadow: 0 8px 18px -8px var(--glow, #000), inset 0 1px 0 rgba(255,255,255,.35); border-radius: 14px; width: 44px; height: 44px; }
+.meal-icon svg .d { fill-opacity: .35; }
+.iconbtn.primary { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent)); box-shadow: 0 8px 18px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,.3); }
+.btn.primary { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, #fff), var(--accent)); box-shadow: 0 8px 20px -10px var(--accent); }
+.quick .btn { gap: 6px; }
+.qi { width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, var(--q1), var(--q2)); box-shadow: 0 6px 14px -7px var(--q2); }
+.quick .btn .qi svg { color: #fff; }
+.qi svg .d { fill-opacity: .35; }
+.tab .pill { transition: background .2s, transform .2s; }
+.tab[aria-current="page"] .pill { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 12%, transparent)); transform: translateY(-1px); }
+.tab[aria-current="page"] svg .d { fill-opacity: .45; }
+.badge.hot { background: linear-gradient(135deg, #FFF1E2, #FFE0D1); color: #C2531C; border-color: transparent; }
+html.dark .badge.hot { background: linear-gradient(135deg, #4A2A17, #3A1E12); color: #FFB27A; }
+.card h2 svg, .card h3 svg { color: var(--accent-text); }
+/* animated backgrounds: skip live blur behind cards so the phone stays smooth */
+html.has-fx .card, html.has-fx .datebtn, html.has-fx .iconbtn, html.has-fx .badge, html.has-fx .topbar h1, html.has-fx .quick .btn { backdrop-filter: none; -webkit-backdrop-filter: none; }
+html.has-fx { --card: rgba(var(--card-rgb), max(var(--card-alpha), .82)); }

@@ -6,10 +6,10 @@ const FD = window.Foods;
 const A = window.Android || null;
 const MEALS = P.MEALS;
 const MEAL = {
-  breakfast: { label: 'בוקר', icon: 'sunrise', tint: '#E9862F' },
-  lunch: { label: 'צהריים', icon: 'sun', tint: '#D9A21B' },
-  dinner: { label: 'ערב', icon: 'moon', tint: '#4F6FB0' },
-  snack: { label: 'ביניים', icon: 'cup', tint: '#2F8F6A' },
+  breakfast: { label: 'בוקר', icon: 'sunrise', tint: '#E9862F', grad: 'linear-gradient(135deg,#FFC36B,#FF7A59)' },
+  lunch: { label: 'צהריים', icon: 'sun', tint: '#D9A21B', grad: 'linear-gradient(135deg,#FFE07A,#F5A524)' },
+  dinner: { label: 'ערב', icon: 'moon', tint: '#4F6FB0', grad: 'linear-gradient(135deg,#8E9BFF,#4E5BD0)' },
+  snack: { label: 'ביניים', icon: 'cup', tint: '#2F8F6A', grad: 'linear-gradient(135deg,#5EE0B2,#22997A)' },
 };
 const MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 const ACCENTS = ['#2F7D4F', '#2C7F9A', '#4F5FC0', '#8A4FB0', '#C2456E', '#C0581F', '#8A6A1F', '#3F4B45'];
@@ -23,62 +23,47 @@ const IC = {
   minus: '<path d="M5 12h14"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
-  copy: '<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
-  paste: '<path d="M9 4h6v3H9z"/><path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h4"/>',
-  share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>',
-  book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/>',
-  history: '<path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/><path d="M12 8v4l3 2"/>',
-  chart: '<path d="M5 20V11M12 20V5M19 20v-7"/>',
-  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  copy: '<rect class="d" x="8" y="8" width="12" height="12" rx="3"/><rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/>',
+  paste: '<rect class="d" x="5" y="5" width="14" height="16" rx="3"/><path d="M9 4h6v3H9z"/><path d="M15 5h1.5A2.5 2.5 0 0 1 19 7.5v11a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 18.5v-11A2.5 2.5 0 0 1 7.5 5H9"/><path d="M9 12h6M9 16h4"/>',
+  share: '<circle class="d" cx="18" cy="5" r="2.8"/><circle class="d" cx="6" cy="12" r="2.8"/><circle class="d" cx="18" cy="19" r="2.8"/><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><path d="M8.4 10.7l7.2-4.2M8.4 13.3l7.2 4.2"/>',
+  book: '<rect class="d" x="5" y="3" width="14" height="18" rx="3.5"/><rect x="5" y="3" width="14" height="18" rx="3.5"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  history: '<rect class="d" x="3.5" y="5" width="17" height="15.5" rx="3.5"/><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M12 14h4M8 17h4"/>',
+  chart: '<rect class="d" x="4" y="11" width="4" height="9" rx="1.6"/><rect class="d" x="10" y="4" width="4" height="16" rx="1.6"/><rect class="d" x="16" y="8" width="4" height="12" rx="1.6"/><rect x="4" y="11" width="4" height="9" rx="1.6"/><rect x="10" y="4" width="4" height="16" rx="1.6"/><rect x="16" y="8" width="4" height="12" rx="1.6"/>',
+  gear: '<path d="M4 7h8.5M17.5 7H20M4 17h2.5M11.5 17H20"/><circle class="d" cx="15" cy="7" r="2.6"/><circle cx="15" cy="7" r="2.6"/><circle class="d" cx="9" cy="17" r="2.6"/><circle cx="9" cy="17" r="2.6"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   dots: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
-  sunrise: '<path d="M4 18h16M7 14a5 5 0 0 1 10 0"/><path d="M12 3v4M5.6 7.6l1.4 1.4M18.4 7.6L17 9M2 14h2M20 14h2"/>',
-  sun: '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
-  cup: '<path d="M5 8h12v5a6 6 0 0 1-12 0z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 2.5c0 1.2 1 1.2 1 2.5M12 2.5c0 1.2 1 1.2 1 2.5"/>',
-  drop: '<path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"/>',
-  glass: '<path d="M6 3h12l-1.6 17a1.5 1.5 0 0 1-1.5 1.3H9.1a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M6.6 9h10.8" />',
-  flame: '<path d="M12 22c4 0 7-2.7 7-7 0-4-3-6.5-4-10-2 2-2.5 4-2.5 5.5C11 9 10 7.5 10 6c-3 2.5-5 5.5-5 9 0 4.3 3 7 7 7z"/>',
-  image: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
-  bookmark: '<path d="M6 3h12v18l-6-4-6 4z"/>',
-  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
-  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2 0-1.5-1-2 0-3s2-.5 3-.5a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.2" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
+  sunrise: '<path class="d" d="M6 15a6 6 0 0 1 12 0z"/><path d="M6 15a6 6 0 0 1 12 0M3 15h18M7 19h10M12 4v3M4.9 8l1.6 1.4M19.1 8l-1.6 1.4"/>',
+  sun: '<circle class="d" cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2.5 12h2M19.5 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path class="d" d="M19.5 14.5A8 8 0 1 1 9.5 4.5a6.5 6.5 0 0 0 10 10z"/><path d="M19.5 14.5A8 8 0 1 1 9.5 4.5a6.5 6.5 0 0 0 10 10z"/><path d="M17 3.5v3M15.5 5h3"/>',
+  cup: '<path class="d" d="M5 9h12v4a6 6 0 0 1-12 0z"/><path d="M5 9h12v4a6 6 0 0 1-12 0z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 2.5c0 1.2 1 1.2 1 2.5M12 2.5c0 1.2 1 1.2 1 2.5"/>',
+  drop: '<path class="d" d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"/><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"/><path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/>',
+  glass: '<path d="M6 3h12l-1.6 17a1.5 1.5 0 0 1-1.5 1.3H9.1a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M6.6 9h10.8"/>',
+  flame: '<path class="d" d="M12 22c4 0 7-2.7 7-7 0-4-3-6.5-4-10-2 2-2.5 4-2.5 5.5C11 9 10 7.5 10 6c-3 2.5-5 5.5-5 9 0 4.3 3 7 7 7z"/><path d="M12 22c4 0 7-2.7 7-7 0-4-3-6.5-4-10-2 2-2.5 4-2.5 5.5C11 9 10 7.5 10 6c-3 2.5-5 5.5-5 9 0 4.3 3 7 7 7z"/>',
+  image: '<rect class="d" x="3" y="4" width="18" height="16" rx="3.5"/><rect x="3" y="4" width="18" height="16" rx="3.5"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
+  bookmark: '<path class="d" d="M6 3h12v18l-6-4-6 4z"/><path d="M6 3h12v18l-6-4-6 4z"/>',
+  bell: '<path class="d" d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
+  palette: '<path class="d" d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2 0-1.5-1-2 0-3s2-.5 3-.5a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2 0-1.5-1-2 0-3s2-.5 3-.5a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.2" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   cal: '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>',
-  list: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
+  list: '<rect class="d" x="3" y="4" width="18" height="16" rx="3.5"/><path d="M9 9h8M9 12h8M9 15h8M6.5 9h.01M6.5 12h.01M6.5 15h.01"/>',
   leaf: '<path d="M5 19c0-8 5-14 15-15-1 10-7 15-15 15z"/><path d="M5 19l8-8"/>',
-  note: '<path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4M8 9h8M8 13h5"/>',
+  note: '<path class="d" d="M5 4h14v12l-4 4H5z"/><path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4M8 9h8M8 13h5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
   merge: '<path d="M6 4v5a5 5 0 0 0 5 5h7"/><path d="M15 11l3 3-3 3"/><path d="M6 20v-3"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
-  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  sparkle: '<path class="d" d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15.5v4M17 17.5h4"/>',
+  dice: '<rect class="d" x="4" y="4" width="16" height="16" rx="4.5"/><rect x="4" y="4" width="16" height="16" rx="4.5"/><g fill="currentColor" stroke="none"><circle cx="9" cy="9" r="1.4"/><circle cx="15" cy="15" r="1.4"/><circle cx="15" cy="9" r="1.4"/><circle cx="9" cy="15" r="1.4"/><circle cx="12" cy="12" r="1.4"/></g>',
+  file: '<path class="d" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
 };
 function icon(name, size = 22, extra = '') {
-  return `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${extra}>${IC[name] || ''}</svg>`;
+  return `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" ${extra}>${IC[name] || ''}</svg>`;
 }
 
-/* ---------------- built-in backgrounds ---------------- */
-function svgUrl(svg) { return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`; }
-const LEAF_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><g fill="none" stroke="#9CC3A4" stroke-width="2" stroke-linecap="round" opacity=".55"><path d="M20 50c0-16 10-28 30-30-2 20-14 30-30 30z"/><path d="M20 50l16-16"/><path d="M80 110c0-14 9-24 26-26-2 17-12 26-26 26z"/><path d="M80 110l14-14"/></g><g fill="#F2C38B" opacity=".5"><circle cx="90" cy="30" r="4"/><circle cx="40" cy="95" r="3"/></g></svg>`;
-const FRUIT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140"><g opacity=".5"><circle cx="30" cy="34" r="14" fill="#F6B26B"/><circle cx="30" cy="34" r="9" fill="none" stroke="#fff" stroke-width="2"/><path d="M30 25v18M21 34h18" stroke="#fff" stroke-width="1.5"/><circle cx="102" cy="96" r="12" fill="#E06666"/><path d="M102 84c2-5 6-6 9-6" stroke="#6AA84F" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="104" cy="30" rx="9" ry="13" fill="#93C47D" transform="rotate(30 104 30)"/><circle cx="40" cy="108" r="6" fill="#B4A7D6"/><circle cx="50" cy="104" r="6" fill="#B4A7D6"/><circle cx="45" cy="114" r="6" fill="#B4A7D6"/></g></svg>`;
-const WAVE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="60" viewBox="0 0 160 60"><path d="M0 30c20-14 60-14 80 0s60 14 80 0" fill="none" stroke="#9FC9DA" stroke-width="2" opacity=".6"/></svg>`;
-const BUILTIN_BGS = [
-  { id: 'plain', name: 'ללא', css: '' },
-  { id: 'sage', name: 'מרווה', css: 'linear-gradient(160deg,#E2EEE1 0%,#F4F1E6 100%)' },
-  { id: 'sunrise', name: 'זריחה', css: 'linear-gradient(165deg,#FFE1C4 0%,#FBD2D8 50%,#E6DEF7 100%)' },
-  { id: 'sea', name: 'ים', css: `${svgUrl(WAVE_SVG)} 0 0/160px 60px, linear-gradient(170deg,#CDE7F2 0%,#EAF4F1 60%,#F7F1E6 100%)` },
-  { id: 'leaves', name: 'עלים', css: `${svgUrl(LEAF_SVG)} 0 0/120px 120px, linear-gradient(170deg,#EEF4EA,#F7F5EE)` },
-  { id: 'fruit', name: 'פירות', css: `${svgUrl(FRUIT_SVG)} 0 0/140px 140px, #FBF7F0` },
-  { id: 'dots', name: 'נקודות', css: 'radial-gradient(#CDD3C8 1.3px, transparent 1.6px) 0 0/18px 18px, #F5F6F2' },
-  { id: 'grid', name: 'מחברת', css: 'linear-gradient(#DCE4EF 1px, transparent 1px) 0 0/100% 28px, linear-gradient(90deg,#DCE4EF 1px, transparent 1px) 0 0/28px 100%, #FBFCFE' },
-  { id: 'lavender', name: 'לבנדר', css: 'linear-gradient(160deg,#E9E2F6 0%,#F8F2F6 100%)' },
-  { id: 'forest', name: 'יער', css: 'radial-gradient(circle at 80% 0%,#2F5A45 0%,#152A22 60%,#0D1A15 100%)', dark: true },
-  { id: 'night', name: 'לילה', css: 'radial-gradient(circle at 20% 10%,#34405F 0%,#151B2B 60%,#0E121C 100%)', dark: true },
-  { id: 'dusk', name: 'שקיעה', css: 'linear-gradient(180deg,#2B2C5A 0%,#7B3F6E 50%,#E08A5A 100%)', dark: true },
-];
+/* ---------------- backgrounds (bgs.js) ---------------- */
+const BUILTIN_BGS = window.Backgrounds.LIST;
 
 /* ---------------- utils ---------------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -109,7 +94,7 @@ function freshDb() {
   return {
     v: 1, days: {}, foods: {}, aliases: {}, templates: [],
     settings: {
-      theme: 'auto', accent: '#2F7D4F', bg: 'sage', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false,
+      theme: 'auto', accent: '#2F7D4F', bg: 'sage', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false, motion: true,
       showWater: true, waterGoal: 8, reminder: { on: false, h: 21, m: 0 },
     },
   };
@@ -232,7 +217,7 @@ function guessCat(name) {
 function newItem(it) { return { id: uid(), name: it.name, qty: it.qty == null ? null : it.qty, unit: it.unit || null, with: it.with || [], note: it.note || '' }; }
 
 /* ---------------- app state ---------------- */
-const S = { tab: 'today', date: todayISO(), statsRange: 7, statsMeal: '', histQuery: '', histMonth: todayISO().slice(0, 7), histLimit: 40 };
+const S = { bgCat: 'all', tab: 'today', date: todayISO(), statsRange: 7, statsMeal: '', histQuery: '', histMonth: todayISO().slice(0, 7), histLimit: 40 };
 
 /* ---------------- theme & background ---------------- */
 const bgCache = {};
@@ -268,10 +253,17 @@ async function applyTheme() {
   }
   bgEl.style.background = css || 'var(--page)';
   if (!css) bgEl.style.backgroundColor = 'var(--page)';
+  const bdef = BUILTIN_BGS.find(x => x.id === id);
+  const fx = (bdef && bdef.fx) || '';
+  const fxEl = $('#bgFx');
+  if (fxEl.dataset.fx !== fx) { fxEl.dataset.fx = fx; fxEl.innerHTML = fx ? window.Backgrounds.fxHtml(fx) : ''; }
+  document.documentElement.classList.toggle('still', s.motion === false);
+  document.documentElement.classList.toggle('has-fx', !!fx && s.motion !== false);
   try { A && A.setBars && A.setBars(dark ? '#111613' : '#F3F4EF', darkTop); } catch (e) { }
 }
 function rotatingBg() {
   const pool = customBgIds.length ? customBgIds.map(i => 'custom:' + i) : BUILTIN_BGS.filter(b => b.id !== 'plain').map(b => b.id);
+  pool.sort();
   const d = parseISO(todayISO());
   const dayNum = Math.floor(d.getTime() / 86400000);
   return pool[dayNum % pool.length];
@@ -409,15 +401,15 @@ function viewToday() {
       <button class="iconbtn" data-act="nextDay" aria-label="היום הבא">${icon('chev-l')}</button>
     </div>
     <div class="badges">
-      ${st ? `<span class="badge hot">${icon('flame', 16)}רצף ${st} ${st === 1 ? 'יום' : 'ימים'}</span>` : ''}
+      ${st ? `<span class="badge hot">${icon('flame', 17)}רצף ${st} ${st === 1 ? 'יום' : 'ימים'}</span>` : ''}
       ${!isToday ? `<button class="badge" data-act="goToday">${icon('cal', 16)}חזרה להיום</button>` : ''}
       <span class="badge">${icon('check', 16)}${mealsCount(day)} מתוך 4 ארוחות</span>
     </div>
   </section>
   <div class="quick">
-    <button class="btn" data-act="copyYesterday">${icon('copy')}העתק מאתמול</button>
-    <button class="btn" data-act="openImport" data-mode="day">${icon('paste')}הדבק טקסט</button>
-    <button class="btn" data-act="shareDay">${icon('share')}שתף את היום</button>
+    <button class="btn" data-act="copyYesterday"><span class="qi" style="--q1:#7C9BFF;--q2:#5363D6">${icon('copy', 20)}</span>העתק מאתמול</button>
+    <button class="btn" data-act="openImport" data-mode="day"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('paste', 20)}</span>הדבק טקסט</button>
+    <button class="btn" data-act="shareDay"><span class="qi" style="--q1:#5EE0B2;--q2:#1E9C7A">${icon('share', 20)}</span>שתף את היום</button>
   </div>`;
 
   for (const m of MEALS) {
@@ -426,7 +418,7 @@ function viewToday() {
     const tpls = db.templates.filter(t => t.meal === m);
     h += `<section class="card" aria-label="${MEAL[m].label}">
       <div class="meal-head">
-        <span class="meal-icon" style="background:${MEAL[m].tint}22;color:${MEAL[m].tint}">${icon(MEAL[m].icon)}</span>
+        <span class="meal-icon" style="background:${MEAL[m].grad};--glow:${MEAL[m].tint}">${icon(MEAL[m].icon, 24)}</span>
         <div class="meal-title"><h2>${MEAL[m].label}</h2>${items.length ? `<div class="sub">${items.length} ${items.length === 1 ? 'פריט' : 'פריטים'}</div>` : ''}</div>
         <button class="iconbtn flat" data-act="mealMenu" data-meal="${m}" aria-label="אפשרויות ל${MEAL[m].label}">${icon('dots')}</button>
         <button class="iconbtn primary" data-act="openAdd" data-meal="${m}" aria-label="הוספה ל${MEAL[m].label}">${icon('plus')}</button>
@@ -576,16 +568,21 @@ function viewStats() {
 /* ---------------- view: settings ---------------- */
 function bgThumbs() {
   const s = db.settings;
+  const cat = S.bgCat;
   let h = '';
-  for (const b of BUILTIN_BGS) {
-    const style = b.css ? `background:${b.css}` : 'background:var(--page)';
-    h += `<button class="bgthumb" style='${style.replace(/'/g, '&#39;')}' data-act="setBg" data-id="${b.id}" aria-pressed="${s.bg === b.id}" aria-label="רקע ${b.name}">${s.bg === b.id ? `<span class="ck">${icon('check', 16)}</span>` : ''}<span class="nm">${b.name}</span></button>`;
+  if (cat === 'all' || cat === 'mine') {
+    h += `<label class="bgthumb add" role="button" aria-label="הוספת רקע מהגלריה">${icon('image', 26)}<span>מהגלריה</span><input type="file" accept="image/*" data-on="addBg" class="hidden"></label>`;
+    customBgIds.forEach((id, i) => {
+      const sel = s.bg === 'custom:' + id;
+      h += `<button class="bgthumb" style="background-image:url('${bgCache[id]}')" data-act="setBg" data-id="custom:${id}" aria-pressed="${sel}" aria-label="תמונה ${i + 1}">${sel ? `<span class="ck">${icon('check', 16)}</span>` : ''}<span class="nm">תמונה ${i + 1}</span></button>`;
+    });
   }
-  customBgIds.forEach((id, i) => {
-    const sel = s.bg === 'custom:' + id;
-    h += `<button class="bgthumb" style="background-image:url('${bgCache[id]}')" data-act="setBg" data-id="custom:${id}" aria-pressed="${sel}" aria-label="תמונה ${i + 1}">${sel ? `<span class="ck">${icon('check', 16)}</span>` : ''}<span class="nm">תמונה ${i + 1}</span></button>`;
-  });
-  h += `<label class="bgthumb add" role="button" aria-label="הוספת רקע מהגלריה">${icon('image', 26)}<span>מהגלריה</span><input type="file" accept="image/*" data-on="addBg" class="hidden"></label>`;
+  for (const b of BUILTIN_BGS) {
+    if (cat !== 'all' && b.cat !== cat) continue;
+    const style = b.css ? `background:${b.css}` : 'background:var(--page)';
+    const sel = s.bg === b.id;
+    h += `<button class="bgthumb" style='${style.replace(/'/g, '&#39;')}' data-act="setBg" data-id="${b.id}" aria-pressed="${sel}" aria-label="רקע ${b.name}">${b.fx ? `<span class="fx" data-fx="${b.fx}">${window.Backgrounds.fxHtml(b.fx)}</span><span class="tag">${icon('sparkle', 12)}מונפש</span>` : ''}${sel ? `<span class="ck">${icon('check', 16)}</span>` : ''}<span class="nm">${b.name}</span></button>`;
+  }
   return h;
 }
 function sw(act, on, label) { return `<button class="switch" role="switch" aria-checked="${!!on}" data-act="${act}" aria-label="${label}"></button>`; }
@@ -598,11 +595,14 @@ function viewSettings() {
   return `<section class="topbar"><h1>הגדרות</h1></section>
   <section class="card stack">
     <h2 class="row">${icon('image', 20)}רקע</h2>
+    <div class="bgcats" role="group" aria-label="סוג רקע">${window.Backgrounds.CATS.concat(customBgIds.length ? [['mine', 'התמונות שלי']] : []).map(([v, l]) => `<button data-act="bgCat" data-v="${v}" aria-pressed="${S.bgCat === v}">${l}</button>`).join('')}</div>
     <div class="bggrid">${bgThumbs()}</div>
+    <button class="btn soft" data-act="surpriseBg">${icon('dice', 20)}הפתע אותי</button>
     ${isCustom ? `<button class="btn danger" data-act="delBg">${icon('trash', 18)}מחק את התמונה הנבחרת</button>` : ''}
     <label class="field"><span>הכהיית הרקע</span><input type="range" min="0" max="0.7" step="0.05" value="${s.dim}" data-on="dim"></label>
     <label class="field"><span>טשטוש הרקע</span><input type="range" min="0" max="20" step="1" value="${s.blur}" data-on="blur"></label>
     <label class="field"><span>שקיפות הכרטיסים</span><input type="range" min="0.5" max="1" step="0.02" value="${s.cardAlpha}" data-on="cardAlpha"></label>
+    <div class="row between"><span>הנפשת רקעים</span>${sw('motion', s.motion !== false, 'הנפשת רקעים')}</div>
     <div class="row between"><span>רקע מתחלף כל יום</span>${sw('rotateBg', s.rotateBg, 'רקע מתחלף כל יום')}</div>
     <div class="small muted">כשיש תמונות שלך, מתחלפות רק הן. אחרת, הרקעים המובנים.</div>
   </section>
@@ -944,7 +944,7 @@ function renameFood(from, to) {
 function openTemplates() { openSheet('tpls', tplsHtml(), { title: 'ארוחות שמורות' }); }
 function tplsHtml() {
   return sheetHead('ארוחות שמורות') + `<div class="body">${db.templates.length ? `<div class="list">${db.templates.map(t => `<div class="li">
-    <span class="meal-icon" style="background:${MEAL[t.meal].tint}22;color:${MEAL[t.meal].tint}">${icon(MEAL[t.meal].icon, 20)}</span>
+    <span class="meal-icon" style="background:${MEAL[t.meal].grad};--glow:${MEAL[t.meal].tint}">${icon(MEAL[t.meal].icon, 20)}</span>
     <span class="grow"><span class="t">${esc(t.name)}</span><br><span class="s">${esc(t.items.map(it => P.formatItem(it, { short: true })).join(', '))}</span></span>
     <button class="iconbtn plain" data-act="renameTpl" data-id="${t.id}" aria-label="שינוי שם">${icon('edit', 18)}</button>
     <button class="iconbtn plain" data-act="delTpl" data-id="${t.id}" aria-label="מחיקה">${icon('trash', 18)}</button></div>`).join('')}</div>`
@@ -1161,6 +1161,14 @@ const ACT = {
       db.settings.bg = 'sage'; save(); applyTheme(); render({ keepScroll: true });
     });
   },
+  bgCat(el) { S.bgCat = el.dataset.v; render({ keepScroll: true }); },
+  surpriseBg() {
+    const pool = BUILTIN_BGS.filter(b => b.id !== 'plain' && b.id !== db.settings.bg).map(b => b.id).concat(customBgIds.map(i => 'custom:' + i));
+    db.settings.bg = pool[Math.floor(Math.random() * pool.length)]; db.settings.rotateBg = false;
+    const b = BUILTIN_BGS.find(x => x.id === db.settings.bg);
+    save(); applyTheme(); render({ keepScroll: true }); toast(b ? `רקע: ${b.name}` : 'רקע: תמונה שלך');
+  },
+  motion() { db.settings.motion = db.settings.motion === false; save(); applyTheme(); render({ keepScroll: true }); },
   rotateBg() { db.settings.rotateBg = !db.settings.rotateBg; save(); applyTheme(); render({ keepScroll: true }); },
   showWater() { db.settings.showWater = !db.settings.showWater; save(); render({ keepScroll: true }); },
   waterGoal(el) { db.settings.waterGoal = Math.max(1, Math.min(20, db.settings.waterGoal + (+el.dataset.d))); save(); render({ keepScroll: true }); },

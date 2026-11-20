@@ -176,8 +176,16 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        if (::web.isInitialized) {
+            web.evaluateJavascript("window.appPause && window.appPause()", null)
+            web.onPause() // stops animated backgrounds while the app is in the background
+        }
         super.onPause()
-        js("window.appPause && window.appPause()")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::web.isInitialized) web.onResume()
     }
 
     private fun handleShareIntent(intent: Intent?) {
