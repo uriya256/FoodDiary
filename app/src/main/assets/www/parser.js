@@ -110,7 +110,10 @@
   function parseItems(text, lex) {
     const tok = tokenize(text);
     const items = [];
-    let cur = null, mode = 'normal', pQty = null, pUnit = null, conj = false, adjacent = false, vavAdj = false;
+    let cur = null, mode = 'normal', pQty = null, pUnit = null, conj = false, adjacent = false, vavAdj = false, justWith = false;
+    // "טוסט עם גבינה", "פיתה עם חומוס": the first food right after "עם" belongs to a bread or dish
+    const HOLDERS = new Set(['grain', 'whole', 'dish']);
+    const FILLINGS = new Set(['dairy', 'legume', 'protein', 'nuts', 'sauce', 'veg', 'sweet']);
 
     const start = (name, known) => {
       cur = { name, qty: pQty, unit: pUnit, with: [], note: '', known };
@@ -121,9 +124,11 @@
     for (let i = 0; i < tok.length; i++) {
       const t = tok[i];
       const next = tok[i + 1];
+      const wasJustWith = justWith;
+      if (t !== 'עם' && t !== 'ועם') justWith = false;
       if (SEP.has(t)) { cur = null; mode = 'normal'; conj = false; adjacent = false; continue; }
       if (t === 'ו') { vavAdj = adjacent === true; conj = true; adjacent = false; continue; }
-      if (t === 'עם' || t === 'ועם') { if (cur) mode = 'with'; adjacent = false; conj = false; continue; }
+      if (t === 'עם' || t === 'ועם') { if (cur) { mode = 'with'; justWith = true; } adjacent = false; conj = false; continue; }
       if (t === 'ללא' || t === 'בלי' || t === 'וללא' || t === 'ובלי' || t === '~without' || t === '~no') {
         if (cur) { mode = 'without'; cur.note = (cur.note ? cur.note + ', ' : '') + (t[0] === '~' ? t.slice(1) : 'ללא'); }
         adjacent = false; continue;
@@ -163,7 +168,8 @@
         const cat = lex.cats[m.name] || 'other';
         if (m.conj) conj = true;
         i += m.L - 1;
-        if (mode === 'with' && cur && pQty == null && (ATTACH_CATS.has(cat) || ATTACH_NAMES.has(m.name))) {
+        if (mode === 'with' && cur && pQty == null && (ATTACH_CATS.has(cat) || ATTACH_NAMES.has(m.name) ||
+            (wasJustWith && HOLDERS.has(lex.cats[cur.name] || '') && FILLINGS.has(cat)))) {
           cur.with.push(m.name); adjacent = 'with'; conj = false; continue;
         }
         if (mode === 'without' && cur && pQty == null) { cur.note += ' ' + m.raw; continue; }

@@ -110,6 +110,16 @@ class Bridge(private val act: MainActivity) {
         prefs.edit().putString("status_date", date).putInt("status_meals", meals).apply()
     }
 
+    // ---------- AI chat (Google Gemini) ----------
+    @JavascriptInterface
+    fun aiStream(id: String, model: String, key: String, body: String) = Ai.stream(act, id, model, key, body)
+
+    @JavascriptInterface
+    fun aiGet(id: String, path: String, key: String) = Ai.get(act, id, path, key)
+
+    @JavascriptInterface
+    fun aiCancel(id: String) = Ai.cancel(id)
+
     // ---------- water ----------
     @JavascriptInterface
     fun setWaterStatus(date: String, ml: Int, goal: Int, cup: Int) {

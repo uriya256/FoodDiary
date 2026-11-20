@@ -75,6 +75,10 @@ const IC = {
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   sparkle: '<path class="d" d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15.5v4M17 17.5h4"/>',
   dice: '<rect class="d" x="4" y="4" width="16" height="16" rx="4.5"/><rect x="4" y="4" width="16" height="16" rx="4.5"/><g fill="currentColor" stroke="none"><circle cx="9" cy="9" r="1.4"/><circle cx="15" cy="15" r="1.4"/><circle cx="15" cy="9" r="1.4"/><circle cx="9" cy="15" r="1.4"/><circle cx="12" cy="12" r="1.4"/></g>',
+  chat: '<path class="d" d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h-1A.5.5 0 0 1 4 15.5z"/><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h-1A.5.5 0 0 1 4 15.5z"/><path d="M8.5 9.5h.01M12 9.5h.01M15.5 9.5h.01"/>',
+  send: '<path class="d" d="M4 12l16-8-6 16-2.5-6.5z"/><path d="M4 12l16-8-6 16-2.5-6.5z"/><path d="M11.5 13.5L20 4"/>',
+  stop: '<rect class="d" x="6" y="6" width="12" height="12" rx="2.5"/><rect x="6" y="6" width="12" height="12" rx="2.5"/>',
+  brain: '<path class="d" d="M12 4.6c-1-1.4-3.4-1.7-4.7-.2-1.6-.1-2.9 1.3-2.7 2.9C3.1 8.2 2.8 10.4 4 11.6c-1 1.6-.3 3.6 1.4 4.3.3 1.8 2.2 2.9 3.9 2.3.8.9 1.8 1.3 2.7 1.3z"/><path d="M12 4.6c-1-1.4-3.4-1.7-4.7-.2-1.6-.1-2.9 1.3-2.7 2.9C3.1 8.2 2.8 10.4 4 11.6c-1 1.6-.3 3.6 1.4 4.3.3 1.8 2.2 2.9 3.9 2.3.8.9 1.8 1.3 2.7 1.3zM12 4.6c1-1.4 3.4-1.7 4.7-.2 1.6-.1 2.9 1.3 2.7 2.9 1.5.9 1.8 3.1.6 4.3 1 1.6.3 3.6-1.4 4.3-.3 1.8-2.2 2.9-3.9 2.3-.8.9-1.8 1.3-2.7 1.3zM12 4.6v14.9M8 8.6c1 .2 1.7.8 2 1.7M6.6 13.2c1.2 0 2.1.5 2.6 1.4M16 8.6c-1 .2-1.7.8-2 1.7M17.4 13.2c-1.2 0-2.1.5-2.6 1.4"/>',
   bottle: '<path class="d" d="M9 7h6v2c2 1 3 2.5 3 4.5V20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6.5C6 11.5 7 10 9 9z"/><path d="M9 7h6v2c2 1 3 2.5 3 4.5V20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6.5C6 11.5 7 10 9 9z"/><path d="M9.5 3h5v4h-5z"/><path d="M6 15h12"/>',
   star: '<path class="d" d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9z"/><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9z"/>',
   camera: '<path class="d" d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
@@ -405,6 +409,7 @@ window.appSaved = (ok) => toast(ok ? tr('הקובץ נשמר', 'File saved') : t
 const TABS = [
   { id: 'today', get label() { return tr('היום', 'Today'); }, icon: 'book' },
   { id: 'history', get label() { return tr('היסטוריה', 'History'); }, icon: 'history' },
+  { id: 'chat', get label() { return tr('צ׳אט', 'Chat'); }, icon: 'chat' },
   { id: 'stats', get label() { return tr('סיכום', 'Summary'); }, icon: 'chart' },
   { id: 'settings', get label() { return tr('הגדרות', 'Settings'); }, icon: 'gear' },
 ];
@@ -414,13 +419,15 @@ function renderTabs() {
 function render(opts = {}) {
   const sc = $('#screen');
   const keepScroll = opts.keepScroll ? sc.scrollTop : 0;
-  const html = { today: viewToday, history: viewHistory, stats: viewStats, settings: viewSettings }[S.tab]();
+  const html = { today: viewToday, history: viewHistory, chat: viewChat, stats: viewStats, settings: viewSettings }[S.tab]();
   sc.innerHTML = html;
   renderTabs();
   if (opts.anim) { sc.classList.remove('swap'); void sc.offsetWidth; sc.classList.add('swap'); }
   sc.scrollTop = keepScroll;
   if (!opts.anim) $$('.card, .chip', sc).forEach(el => { el.style.animation = 'none'; });
   if (S.tab === 'today') animateBottle();
+  sc.classList.toggle('chatmode', S.tab === 'chat');
+  if (S.tab === 'chat' && !opts.keepScroll) sc.scrollTop = sc.scrollHeight;
 }
 
 /* ---------------- view: today ---------------- */
@@ -668,6 +675,7 @@ function viewSettings() {
     <label class="field ${r.on ? '' : 'hidden'}"><span>${tr('שעה', 'Time')}</span><input type="time" value="${pad(r.h)}:${pad(r.m)}" data-on="remTime"></label>
     ${A ? '' : `<div class="small muted">${tr('תזכורות עובדות באפליקציה המותקנת בטלפון.', 'Reminders work in the app installed on your phone.')}</div>`}
   </section>
+  ${aiSettingsHtml()}
   ${waterSettingsHtml()}
   <section class="card">
     <h2 class="row" style="margin-bottom:4px">${icon('list', 20)}${tr('מאכלים וארוחות', 'Foods and meals')}</h2>
@@ -1085,8 +1093,10 @@ function mergeInto(cur, bak) {
 }
 function finishRestore(mode) {
   const bak = hydrateDb(RESTORE.data);
+  const keepAi = db.settings.ai ? Object.assign({}, db.settings.ai) : null;
   if (mode === 'replace') db = bak;
   else mergeInto(db, bak);
+  if (keepAi && keepAi.key && !(db.settings.ai && db.settings.ai.key)) db.settings.ai = Object.assign({}, db.settings.ai || {}, { key: keepAi.key, model: keepAi.model, fallback: keepAi.fallback });
   RESTORE.data = null;
   closeSheet();
   setLang(db.settings.lang); save(); applyTheme();
@@ -1293,7 +1303,10 @@ const ACT = {
   backup() {
     pullPendingWater();
     const now = new Date();
-    exportFile(`food-diary-backup-${todayISO()}-${pad(now.getHours())}${pad(now.getMinutes())}.json`, JSON.stringify(Object.assign({ app: 'fooddiary', exportedAt: now.toISOString() }, db), null, 1), 'json');
+    const out = Object.assign({ app: 'fooddiary', exportedAt: now.toISOString() }, db);
+    out.settings = Object.assign({}, db.settings);
+    if (out.settings.ai) out.settings.ai = Object.assign({}, out.settings.ai, { key: '' }); // the personal AI key never goes into a file
+    exportFile(`food-diary-backup-${todayISO()}-${pad(now.getHours())}${pad(now.getMinutes())}.json`, JSON.stringify(out, null, 1), 'json');
   },
   restoreMerge() { finishRestore('merge'); },
   restoreReplace() { finishRestore('replace'); },
@@ -1538,11 +1551,15 @@ document.addEventListener('change', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.on === 'promptVal' && e.target.tagName === 'INPUT') { e.preventDefault(); ACT.promptOk(); }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.dataset && e.target.dataset.on === 'chatText') { e.preventDefault(); aiSend(e.target.value); }
 });
 document.addEventListener('submit', (e) => {
   e.preventDefault();
   if (e.target.dataset.form === 'add') ACT.addTyped();
+  if (e.target.dataset.form === 'chat') { const t = e.target.querySelector('textarea'); aiSend(t ? t.value : AI.draft); }
 });
+Object.assign(ACT, AI_ACT);
+Object.assign(ON, AI_ON);
 $('#datePicker').addEventListener('change', (e) => { if (e.target.value) setDate(e.target.value); });
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (db.settings.theme === 'auto') applyTheme(); });
 
