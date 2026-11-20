@@ -24,6 +24,7 @@ function bgName(b) { return LANG === 'en' ? (b.en || b.name) : b.name; }
 function setLang(l) {
   LANG = l === 'en' ? 'en' : 'he';
   P.setLang(LANG);
+  window.Gym.setLang(LANG);
   document.documentElement.lang = LANG;
   document.documentElement.dir = LANG === 'en' ? 'ltr' : 'rtl';
   document.title = tr('יומן אוכל', 'Food Diary');
@@ -83,6 +84,9 @@ const IC = {
   star: '<path class="d" d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9z"/><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9z"/>',
   camera: '<path class="d" d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
   globe: '<circle class="d" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/>',
+  dumbbell: '<rect class="d" x="4.5" y="6.5" width="3.2" height="11" rx="1.3"/><rect class="d" x="16.3" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="4.5" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="16.3" y="6.5" width="3.2" height="11" rx="1.3"/><path d="M2.5 9.5v5M21.5 9.5v5M7.7 12h8.6"/>',
+  timer: '<circle class="d" cx="12" cy="13.5" r="7.5"/><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M12 2.5v3.5M18.6 6.9l1.5-1.5"/>',
+  trophy: '<path class="d" d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5A2.5 2.5 0 0 0 7 10.5M17 6h2.5A2.5 2.5 0 0 1 17 10.5M12 14v3.5M8.5 20.5h7M9.5 17.5h5v3h-5z"/>',
   file: '<path class="d" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
 };
 function icon(name, size = 22, extra = '') {
@@ -119,10 +123,11 @@ function lev(a, b) {
 /* ---------------- data ---------------- */
 function freshDb() {
   return {
-    v: 1, days: {}, foods: {}, aliases: {}, templates: [],
+    v: 1, days: {}, foods: {}, aliases: {}, templates: [], routines: [],
     settings: {
       theme: 'auto', accent: '#2F7D4F', bg: 'sage', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false, motion: true,
       showWater: true, water: WATER_DEFAULTS(), reminder: { on: false, h: 21, m: 0 },
+      showGym: true, gym: { rest: 90 },
       lang: /^(he|iw)/i.test(navigator.language || 'he') ? 'he' : 'en',
     },
   };
@@ -154,6 +159,8 @@ function hydrateDb(d) {
   out.foods = out.foods || {};
   out.aliases = out.aliases || {};
   out.templates = out.templates || [];
+  out.routines = Array.isArray(out.routines) ? out.routines.filter(r => r && r.name && Array.isArray(r.ex)) : [];
+  out.settings.gym = Object.assign({ rest: 90 }, ds.gym || {});
   const prev = db;
   db = out;
   try { migrateWater(); } finally { db = prev; }
@@ -188,9 +195,9 @@ function getDay(iso, create) {
   }
   return d;
 }
-function dayHasData(d) { return d && (MEALS.some(m => d.meals[m] && d.meals[m].length) || (d.drinks && d.drinks.length) || d.note); }
+function dayHasData(d) { return d && (MEALS.some(m => d.meals[m] && d.meals[m].length) || (d.drinks && d.drinks.length) || d.note || !!dayGym(d)); }
 /** A day as text, in the same format the user writes (water as litres). */
-function dayText(iso, d) { d = d || db.days[iso]; return P.dayToText(iso, Object.assign({}, d, { waterMl: drinksMl(d) })); }
+function dayText(iso, d) { d = d || db.days[iso]; return P.dayToText(iso, Object.assign({}, d, { waterMl: drinksMl(d), gymText: gymText(d), gymTitle: gymTitleOf(d) })); }
 function mealsCount(d) { return d ? MEALS.filter(m => d.meals[m] && d.meals[m].length).length : 0; }
 function cleanupDay(iso) { const d = db.days[iso]; if (d && !dayHasData(d) && !Object.values(d.mealNotes || {}).some(Boolean)) delete db.days[iso]; }
 
@@ -490,6 +497,7 @@ function viewToday() {
   }
 
   if (db.settings.showWater) h += waterCardHtml(iso);
+  if (db.settings.showGym !== false || dayGym(day)) h += workoutCardHtml(iso);
   h += `<section class="card"><h3 class="row">${icon('note', 18)}${tr('הערות על היום', 'Notes for the day')}</h3>
     <textarea class="note" rows="2" data-on="dayNote" placeholder="${tr('איך הרגשת, אכלת בחוץ, משהו מיוחד…', 'How you felt, ate out, anything special…')}">${esc((day && day.note) || '')}</textarea></section>`;
   return h;
@@ -508,8 +516,9 @@ function viewHistory() {
   for (let d = 1; d <= daysIn; d++) {
     const iso = `${yy}-${pad(mm)}-${pad(d)}`;
     const n = mealsCount(db.days[iso]);
-    const cls = [n ? 'l' + n : '', iso === t ? 'today' : '', iso > t ? 'future' : ''].join(' ');
-    cal += `<button class="${cls}" data-act="openDay" data-date="${iso}" aria-label="${tr(`${d} ב${monthName(mm - 1)}`, `${monthName(mm - 1)} ${d}`)}${n ? `, ${n} ${tr('ארוחות', 'meals')}` : ''}">${d}</button>`;
+    const gy = !!dayGym(db.days[iso]);
+    const cls = [n ? 'l' + n : '', iso === t ? 'today' : '', iso > t ? 'future' : '', gy ? 'gym' : ''].join(' ');
+    cal += `<button class="${cls}" data-act="openDay" data-date="${iso}" aria-label="${tr(`${d} ב${monthName(mm - 1)}`, `${monthName(mm - 1)} ${d}`)}${n ? `, ${n} ${tr('ארוחות', 'meals')}` : ''}${gy ? `, ${tr('אימון', 'workout')}` : ''}">${d}</button>`;
   }
   const logged = Object.keys(db.days).filter(k => dayHasData(db.days[k])).sort().reverse();
   let list = logged;
@@ -530,7 +539,7 @@ function viewHistory() {
       <button class="iconbtn plain" data-act="histMonth" data-d="1" aria-label="${tr('החודש הבא', 'Next month')}">${icon(chevNext())}</button>
     </div>
     <div class="cal">${cal}</div>
-    <div class="row small muted" style="margin-top:10px;justify-content:center;gap:12px"><span>${tr('כהה יותר = יותר ארוחות רשומות', 'Darker = more meals logged')}</span></div>
+    <div class="row small muted" style="margin-top:10px;justify-content:center;gap:12px"><span>${tr('כהה יותר = יותר ארוחות רשומות', 'Darker = more meals logged')}</span>${gymDates().length ? `<span class="row" style="gap:4px"><i class="gymdot"></i>${tr('אימון', 'Workout')}</span>` : ''}</div>
   </section>
   <div class="searchbox" style="margin-bottom:12px">${icon('search', 18)}<input class="search" type="search" data-on="histSearch" value="${esc(q)}" placeholder="${tr('חיפוש מאכל, למשל פיצה', 'Search a food, e.g. pizza')}" aria-label="${tr('חיפוש בהיסטוריה', 'Search history')}"></div>`;
   if (q) h += `<p class="small muted" style="margin:0 4px 10px">${total ? tr(`נמצא ב-${total} ימים`, `Found on ${total} ${total === 1 ? 'day' : 'days'}`) : tr('לא נמצאו ימים', 'No days found')}</p>`;
@@ -542,6 +551,7 @@ function viewHistory() {
     const lines = MEALS.filter(m => d.meals[m].length).map(m => `<span><b>${MEAL[m].label}:</b> ${hl(d.meals[m].map(it => P.formatItem(it, { short: true })).join(', '))}</span>`);
     const wml = dayWaterMl(d);
     if (wml) lines.push(`<span><b>${tr('מים', 'Water')}:</b> ${fmtAmount(wml)}${wml >= W().goalMl ? ' ✓' : ''}</span>`);
+    if (dayGym(d)) lines.push(`<span><b>${tr('אימון', 'Workout')}:</b> ${hl(gymHistoryLine(d))}</span>`);
     h += `<button class="card dayitem" data-act="openDay" data-date="${iso}">
       <div class="row between"><span style="font-weight:700">${tr('יום ', '')}${P.weekdayName(iso)}, ${shortDate(iso)}</span><span class="small muted">${P.displayDate(iso)}</span></div>
       <div class="lines">${lines.join('')}</div></button>`;
@@ -611,6 +621,7 @@ function viewStats() {
     h += `<div class="barrow"><div class="row between"><span>${esc(n)}</span><span class="muted small">${counts[n]} ${plural(counts[n], 'פעם', 'פעמים', 'time', 'times')}</span></div><div class="bar"><i style="width:${Math.round(counts[n] / maxC * 100)}%"></i></div></div>`;
   }
   h += `</div></section>
+  ${gymStatsHtml(dates)}
   <div class="row" style="gap:8px">
     <button class="btn grow" data-act="sharePeriod">${icon('share', 18)}${tr('שתף כטקסט', 'Share as text')}</button>
     <button class="btn grow" data-act="exportCsv">${icon('download', 18)}${tr('שמור CSV', 'Save CSV')}</button>
@@ -677,6 +688,7 @@ function viewSettings() {
   </section>
   ${aiSettingsHtml()}
   ${waterSettingsHtml()}
+  ${gymSettingsHtml()}
   <section class="card">
     <h2 class="row" style="margin-bottom:4px">${icon('list', 20)}${tr('מאכלים וארוחות', 'Foods and meals')}</h2>
     <div class="list">
@@ -905,8 +917,9 @@ function importHtml() {
     return h;
   }
   const items = r.days.reduce((s, d) => s + MEALS.reduce((a, m) => a + d.meals[m].length, 0), 0);
+  const nGym = r.days.filter(d => d.gymRaw || d.gymTitle).length;
   const existing = r.days.filter(d => dayHasData(db.days[d.date])).length;
-  h += `<div class="preview"><b>${tr(`נמצאו ${r.days.length} ${r.days.length === 1 ? 'יום' : 'ימים'} ו-${items} פריטים`, `Found ${r.days.length} ${r.days.length === 1 ? 'day' : 'days'} and ${items} items`)}</b>${r.newNames.length ? `<br><span class="small">${tr(`${r.newNames.length} מאכלים חדשים יתווספו לרשימה`, `${r.newNames.length} new foods will be added to your list`)}</span>` : ''}</div>`;
+  h += `<div class="preview"><b>${tr(`נמצאו ${r.days.length} ${r.days.length === 1 ? 'יום' : 'ימים'} ו-${items} פריטים`, `Found ${r.days.length} ${r.days.length === 1 ? 'day' : 'days'} and ${items} items`)}</b>${nGym ? `<br><span class="small">${tr(`ו-${nGym} ${nGym === 1 ? 'אימון' : 'אימונים'}`, `and ${nGym} ${nGym === 1 ? 'workout' : 'workouts'}`)}</span>` : ''}${r.newNames.length ? `<br><span class="small">${tr(`${r.newNames.length} מאכלים חדשים יתווספו לרשימה`, `${r.newNames.length} new foods will be added to your list`)}</span>` : ''}</div>`;
   if (!r.days.length) h += `<div class="warn">${tr('לא נמצאו ימים. ודא שיש שורת תאריך כמו 23/10/2026', 'No days found. Make sure there is a date line like 23/10/2026')}${isDay ? tr(' או כותרת ארוחה כמו "בוקר:"', ' or a meal heading like "Breakfast:"') : ''}.</div>`;
   if (existing && !isDay) {
     h += `<div class="field"><span>${tr(`${existing} מהימים כבר קיימים ביומן. מה לעשות איתם?`, `${existing} of these days are already in your diary. What should happen to them?`)}</span><div class="seg">
@@ -921,7 +934,9 @@ function importHtml() {
   h += `<div class="section-t">${tr('תצוגה מקדימה', 'Preview')}</div>`;
   r.days.slice(0, IMP.showDays).forEach(d => {
     const pd = applyMerges(d);
-    h += `<div class="importday">${esc(P.dayToText(d.date, Object.assign(pd, { waterMl: waterRawToMl(d.waterRaw) })))}</div>`;
+    const gr = d.gymRaw ? window.Gym.parseWorkout(d.gymRaw) : null;
+    const gt = gr ? window.Gym.workoutText({ minutes: gr.minutes, note: gr.note, ex: gr.exercises }) : '';
+    h += `<div class="importday">${esc(P.dayToText(d.date, Object.assign(pd, { waterMl: waterRawToMl(d.waterRaw), gymText: gt, gymTitle: d.gymTitle || '' })))}</div>`;
   });
   if (r.days.length > IMP.showDays) h += `<button class="btn" data-act="impMore">${tr(`הצג עוד ${Math.min(20, r.days.length - IMP.showDays)} ימים`, `Show ${Math.min(20, r.days.length - IMP.showDays)} more days`)}</button>`;
   h += `</div><footer><button class="btn" data-act="impBack">${tr('עריכה', 'Edit')}</button><button class="btn primary big grow" data-act="impGo" ${r.days.length ? '' : 'disabled'}>${icon('check', 20)}${tr('ייבוא', 'Import')}</button></footer>`;
@@ -969,7 +984,7 @@ function doImport() {
   const r = IMP.result;
   if (!r) return;
   Object.keys(IMP.merges).forEach(a => { if (IMP.merges[a]) db.aliases[nk(a)] = IMP.merges[a]; });
-  let nDays = 0, nItems = 0;
+  let nDays = 0, nItems = 0, nGym = 0;
   for (const raw of r.days) {
     const d = applyMerges(raw);
     const exists = dayHasData(db.days[d.date]);
@@ -988,6 +1003,7 @@ function doImport() {
     if (d.note) day.note = day.note ? day.note + '\n' + d.note : d.note;
     const wml = waterRawToMl(d.waterRaw);
     if (wml && (!drinksMl(day) || IMP.conflict === 'replace')) day.drinks = [{ t: null, ml: Math.round(wml) }];
+    if ((d.gymRaw || d.gymTitle) && importGym(day, d.gymRaw, d.gymTitle, exists && IMP.conflict === 'replace' && IMP.mode !== 'day')) nGym++;
     nDays++;
   }
   save();
@@ -997,7 +1013,7 @@ function doImport() {
     S.histMonth = last.slice(0, 7);
   }
   render({ keepScroll: true });
-  toast(tr(`יובאו ${nDays} ${nDays === 1 ? 'יום' : 'ימים'} ו-${nItems} פריטים`, `Imported ${nDays} ${nDays === 1 ? 'day' : 'days'} and ${nItems} items`));
+  toast(tr(`יובאו ${nDays} ${nDays === 1 ? 'יום' : 'ימים'} ו-${nItems} פריטים`, `Imported ${nDays} ${nDays === 1 ? 'day' : 'days'} and ${nItems} items`) + (nGym ? tr(`, ${nGym} אימונים`, `, ${nGym} workouts`) : ''));
 }
 
 /* ----- foods manager ----- */
@@ -1085,7 +1101,10 @@ function mergeInto(cur, bak) {
     bd.forEach(x => { if (!keys.has(`${x.t}|${x.ml}`)) { c.drinks.push({ t: x.t || null, ml: +x.ml }); keys.add(`${x.t}|${x.ml}`); } });
     if (b.note && b.note !== c.note) c.note = c.note ? (c.note.includes(b.note) ? c.note : c.note + '\n' + b.note) : b.note;
     Object.keys(b.mealNotes || {}).forEach(m => { if (!c.mealNotes[m]) c.mealNotes[m] = b.mealNotes[m]; });
+    mergeGym(c, b);
   }
+  const rids = new Set((cur.routines = cur.routines || []).map(r => r.name));
+  (bak.routines || []).forEach(r => { if (!rids.has(r.name)) cur.routines.push(r); });
   cur.foods = Object.assign({}, bak.foods || {}, cur.foods);
   cur.aliases = Object.assign({}, bak.aliases || {}, cur.aliases);
   const ids = new Set(cur.templates.map(t => t.id));
@@ -1126,6 +1145,8 @@ function csvOf(dates) {
     MEALS.forEach(m => d.meals[m].forEach(it => rows.push([P.displayDate(iso), P.weekdayName(iso), MEAL[m].label, it.name, it.qty == null ? '' : it.qty, it.unit ? P.unitName(it.unit) : '', (it.with || []).join(' + '), it.note || '', catLabel(catOf(it.name))])));
     const wml = drinksMl(d);
     if (wml) rows.push([P.displayDate(iso), P.weekdayName(iso), tr('מים', 'Water'), tr('מים', 'Water'), wml, tr('מ״ל', 'ml'), '', '', catLabel('drink')]);
+    const g = dayGym(d);
+    if (g) g.ex.forEach(e => rows.push([P.displayDate(iso), P.weekdayName(iso), tr('אימון', 'Workout'), window.Gym.displayName(e.name), window.Gym.exDetail(e), '', '', g.title || '', groupLabel(window.Gym.groupOf(e.name))]));
   });
   return '﻿' + rows.map(r => r.map(c => { const s = String(c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
 }
@@ -1556,10 +1577,11 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('submit', (e) => {
   e.preventDefault();
   if (e.target.dataset.form === 'add') ACT.addTyped();
+  if (e.target.dataset.form === 'gym') gymSubmit();
   if (e.target.dataset.form === 'chat') { const t = e.target.querySelector('textarea'); aiSend(t ? t.value : AI.draft); }
 });
-Object.assign(ACT, AI_ACT);
-Object.assign(ON, AI_ON);
+Object.assign(ACT, AI_ACT, GYM_ACT);
+Object.assign(ON, AI_ON, GYM_ON);
 $('#datePicker').addEventListener('change', (e) => { if (e.target.value) setDate(e.target.value); });
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (db.settings.theme === 'auto') applyTheme(); });
 

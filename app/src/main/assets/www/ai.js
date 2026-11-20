@@ -103,7 +103,7 @@ function aiSystemPrompt() {
   const w = W();
   const mem = aiDb().memory;
   const lang = LANG === 'en' ? 'English' : 'Hebrew';
-  return `You are a warm, practical companion inside the user's food-diary app ("${tr('יומן אוכל', 'Food Diary')}"). You talk with the user about what they ate, their habits, water, and ideas for meals, using their real diary below.
+  return `You are a warm, practical companion inside the user's food-diary app ("${tr('יומן אוכל', 'Food Diary')}"). You talk with the user about what they ate, their habits, water, their gym workouts, and ideas for meals, using their real diary below. Diary lines that start with "אימון"/"Workout" are gym sessions: "3x10 60 ק״ג" means 3 sets of 10 reps with 60 kg; "12/10/8x40/45/50" lists each set's reps and kg.
 
 Today is ${P.weekdayName(iso)} ${P.displayDate(iso)}, time ${pad(now.getHours())}:${pad(now.getMinutes())}. Reply in ${lang} unless the user writes in another language. Keep answers short and friendly (usually 2–6 sentences or a short list). Use the diary to give concrete, personal answers (dates, foods, amounts). Do not invent diary entries.
 
@@ -117,6 +117,7 @@ ${aiSet().allowLog ? `
 LOGGING — when the user tells you they ate or drank something and it is not already in the diary for that day, add it with a tag (one tag per meal):
 <log date="YYYY-MM-DD" meal="breakfast|lunch|dinner|snack">items in the user's words, e.g. 2 פרוסות לחם, חביתה</log>
 For water: <water date="YYYY-MM-DD" ml="250"/>
+For a gym workout they did (exercises, sets x reps, kg, minutes), one tag per day: <workout date="YYYY-MM-DD">exercises in the user's words, e.g. סקוואט 4x8 80 קג, הליכון 20 דקות</workout>
 If the meal isn't clear, choose by time (before 11:00 breakfast, 11–16 lunch, 16–21 dinner, otherwise snack). Don't log things they only plan or consider eating.` : ''}
 Tags are hidden from the user and handled by the app; mention briefly in words what you saved or logged.
 
@@ -138,11 +139,11 @@ function aiContents() {
 }
 
 /* ---------- tags the model writes ---------- */
-const TAG_RE = /<(remember)>([\s\S]*?)<\/remember>|<forget\s+id="([^"]+)"\s*\/?>(?:<\/forget>)?|<log\s+([^>]*)>([\s\S]*?)<\/log>|<water\s+([^>]*?)\/?>(?:<\/water>)?/g;
+const TAG_RE = /<(remember)>([\s\S]*?)<\/remember>|<forget\s+id="([^"]+)"\s*\/?>(?:<\/forget>)?|<log\s+([^>]*)>([\s\S]*?)<\/log>|<water\s+([^>]*?)\/?>(?:<\/water>)?|<workout\b([^>]*)>([\s\S]*?)<\/workout>/g;
 function attrs(s) { const o = {}; String(s || '').replace(/(\w+)="([^"]*)"/g, (m, k, v) => { o[k] = v; }); return o; }
 function stripTags(text) {
   return text.replace(TAG_RE, '')
-    .replace(/<(remember|log|water|forget)\b[^]*$/i, '') // a tag still streaming in
+    .replace(/<(remember|log|water|forget|workout)\b[^]*$/i, '') // a tag still streaming in
     .replace(/\n{3,}/g, '\n\n').trim();
 }
 function applyTags(raw, msg) {
@@ -175,6 +176,16 @@ function applyTags(raw, msg) {
         const t = date === todayISO() ? nowHHMM() : null;
         d.drinks.push({ t, ml }); actions.push({ type: 'water', date, ml, t });
       }
+    } else if (m[8] != null && aiSet().allowLog) {
+      const a = attrs(m[7]);
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') ? a.date : todayISO();
+      const r = window.Gym.parseWorkout(m[8]);
+      if (r.exercises.length) {
+        const g = gymOf(date, true);
+        const added = addExercises(date, r.exercises);
+        if (r.minutes && !g.minutes) g.minutes = r.minutes;
+        actions.push({ type: 'workout', date, ids: added.map(x => x.id), text: added.map(x => window.Gym.exText(x)).join(', ') });
+      }
     }
   }
   msg.actions = actions;
@@ -186,6 +197,7 @@ function undoAction(msg, i) {
   if (a.type === 'remember') ai.memory = ai.memory.filter(x => x.id !== a.id);
   else if (a.type === 'forget' && a.fact) ai.memory.push(a.fact);
   else if (a.type === 'log') { const d = getDay(a.date, false); if (d) { d.meals[a.meal] = d.meals[a.meal].filter(x => !a.ids.includes(x.id)); cleanupDay(a.date); } }
+  else if (a.type === 'workout') { const d = getDay(a.date, false); if (d && d.gym) { d.gym.ex = d.gym.ex.filter(x => !a.ids.includes(x.id)); pruneGym(a.date); } }
   else if (a.type === 'water') { const d = getDay(a.date, false); if (d && d.drinks) { const k = d.drinks.findIndex(x => x.ml === a.ml && x.t === a.t); if (k >= 0) d.drinks.splice(k, 1); cleanupDay(a.date); } }
   a.undone = true;
   save();
@@ -215,9 +227,10 @@ function actionCard(msg, i) {
   const label = a.type === 'remember' ? [`נשמר בזיכרון: ${a.text}`, `Remembered: ${a.text}`]
     : a.type === 'forget' ? [`נמחק מהזיכרון: ${a.text}`, `Forgot: ${a.text}`]
     : a.type === 'log' ? [`נוסף ל${mealName} (${d}): ${a.text}`, `Added to ${mealName} (${d}): ${a.text}`]
+    : a.type === 'workout' ? [`נוסף לאימון (${d}): ${a.text}`, `Added to workout (${d}): ${a.text}`]
     : [`נוספו ${fmtAmount(a.ml)} מים (${d})`, `Added ${fmtAmount(a.ml)} of water (${d})`];
-  const ic = { remember: 'brain', forget: 'brain', log: 'book', water: 'drop' }[a.type];
-  return `<div class="aact ${a.undone ? 'undone' : ''}">${icon(ic, 16)}<span class="grow">${esc(tr(label[0], label[1]))}</span>${a.undone ? `<span class="small">${tr('בוטל', 'Undone')}</span>` : `<button class="linkbtn" data-act="aiUndo" data-id="${msg.id}" data-i="${i}">${tr('ביטול', 'Undo')}</button>`}</div>`;
+  const ic = { remember: 'brain', forget: 'brain', log: 'book', water: 'drop', workout: 'dumbbell' }[a.type];
+  return `<div class="aact ${a.undone ? 'undone' : ''}">${icon(ic, 16)}<span class="grow">${a.type === 'workout' ? gymHtml(tr(label[0], label[1])) : esc(tr(label[0], label[1]))}</span>${a.undone ? `<span class="small">${tr('בוטל', 'Undone')}</span>` : `<button class="linkbtn" data-act="aiUndo" data-id="${msg.id}" data-i="${i}">${tr('ביטול', 'Undo')}</button>`}</div>`;
 }
 function bubble(m) {
   const mine = m.role === 'user';
@@ -232,8 +245,8 @@ function viewChat() {
   const msgs = aiDb().messages;
   if (!msgs.length) {
     const sug = LANG === 'en'
-      ? ['What did I eat this week?', 'How am I doing with water today?', 'Suggest a dinner based on what I ate today', 'Remember that I don’t eat cilantro', 'I just had a toast with cheese']
-      : ['מה אכלתי השבוע?', 'איך אני עם המים היום?', 'תציע ארוחת ערב לפי מה שאכלתי היום', 'תזכור שאני לא אוהב כוסברה', 'אכלתי עכשיו טוסט עם גבינה'];
+      ? ['What did I eat this week?', 'How am I doing with water today?', 'Suggest a dinner based on what I ate today', 'How am I progressing at the gym?', 'Remember that I don’t eat cilantro', 'I just had a toast with cheese']
+      : ['מה אכלתי השבוע?', 'איך אני עם המים היום?', 'תציע ארוחת ערב לפי מה שאכלתי היום', 'איך אני מתקדם באימונים?', 'תזכור שאני לא אוהב כוסברה', 'אכלתי עכשיו טוסט עם גבינה'];
     h += `<div class="card chat-hello"><div class="row" style="gap:10px"><span class="qi" style="--q1:#A78BFA;--q2:#6D5BD0">${icon('sparkle', 20)}</span><b>${tr('היי! אני מכיר את כל היומן שלך', 'Hi! I know your whole diary')}</b></div>
       <p class="small muted" style="margin:8px 0 0">${tr('אפשר לשאול אותי על מה שאכלת, לבקש רעיונות, או פשוט לספר לי מה אכלת ואני ארשום. מה שתספר לי על עצמך אזכור גם בפעם הבאה.', 'Ask about what you ate, get ideas, or just tell me what you ate and I’ll log it. What you tell me about yourself I’ll remember next time too.')}</p>
       <div class="chips">${sug.map(t => `<button class="chip" data-act="aiSuggest" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>`;

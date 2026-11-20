@@ -209,6 +209,8 @@
   const MEAL_MAP_EN = { breakfast: 'breakfast', brunch: 'breakfast', lunch: 'lunch', dinner: 'dinner', supper: 'dinner', snack: 'snack', snacks: 'snack', dessert: 'snack' };
   const WATER_RE = /^(?:מים|water)\s*[:\-–]\s*(\d+(?:[.,]\d+)?)\s*([^\s\d]*)/i;
   const NOTES_RE = /^(?:הערות|notes?)\s*[:\-–]\s*(.*)$/i;
+  // "אימון: …", "אימון (חזה וכתפיים): …", "אימון רגליים: …", "Workout: …" — gym lines, read by gym.js
+  const GYM_HEAD = /^(?:אימון|אימונים|כושר|חדר כושר|ספורט|workout|gym|training|exercise)(?=$|[\s:：\-–(])/i;
   const DATE_RE = /^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?(?!\d)(.*)$/;
 
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -262,6 +264,25 @@
       if (wm && day) { day.waterRaw = { n: parseFloat(wm[1].replace(',', '.')), unit: (wm[2] || '').replace(/[.,;]+$/, '') }; continue; }
       const nm = line.match(NOTES_RE);
       if (nm && day) { day.note = day.note ? day.note + '\n' + nm[1] : nm[1]; continue; }
+      const gh = line.match(GYM_HEAD);
+      if (gh) {
+        if (!day) {
+          if (opts.defaultDate) newDay(opts.defaultDate);
+          else { warnings.push({ line, msg: 'meal_no_date' }); continue; }
+        }
+        let rest = line.slice(gh[0].length), title = '';
+        const pm = rest.match(/^\s*\(([^)]*)\)/);
+        if (pm) { title = pm[1].trim(); rest = rest.slice(pm[0].length); }
+        const cm = rest.match(/^\s*([^:：\d]{0,30}?)\s*[:：\-–]\s*([\s\S]*)$/);
+        if (cm) { if (cm[1].trim()) title = title || cm[1].trim(); rest = cm[2]; }
+        else if (!/\d/.test(rest)) { if (rest.trim()) title = title || rest.trim(); rest = ''; }
+        else rest = line; // "אימון 45 דקות"
+        if (title) day.gymTitle = title;
+        rest = rest.trim();
+        if (rest) day.gymRaw = day.gymRaw ? day.gymRaw + '\n' + rest : rest;
+        meal = 'gym';
+        continue;
+      }
       let mm = line.match(MEAL_RE);
       if (!mm) { const me = line.match(MEAL_RE_EN); if (me) mm = [me[0], 'EN:' + MEAL_MAP_EN[me[1].toLowerCase()], me[2]]; }
       if (mm) {
@@ -280,6 +301,7 @@
         if (opts.defaultDate) newDay(opts.defaultDate);
         else { warnings.push({ line, msg: 'before_date' }); continue; }
       }
+      if (meal === 'gym') { day.gymRaw = day.gymRaw ? day.gymRaw + '\n' + line : line; continue; }
       if (!meal) {
         day.note = day.note ? day.note + '\n' + line : line;
         warnings.push({ line, date: day.date, msg: 'no_meal' });
@@ -405,6 +427,10 @@
       const l = Math.round(day.waterMl / 10) / 100;
       out.push(en ? `• Water: ${l} L` : `• מים: ${l} ליטר`);
     } else if (day.water) out.push(en ? `• Water: ${day.water} glasses` : `• מים: ${day.water} כוסות`);
+    if (day.gymText || day.gymTitle) {
+      const t = day.gymTitle ? ` (${day.gymTitle})` : '';
+      out.push((en ? `• Workout${t}: ` : `• אימון${t}: `) + (day.gymText || ''));
+    }
     if (day.note) out.push(en ? `• Notes: ${day.note}` : `• הערות: ${day.note}`);
     return out.join('\n');
   }

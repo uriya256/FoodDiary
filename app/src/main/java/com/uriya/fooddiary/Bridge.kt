@@ -141,6 +141,17 @@ class Bridge(private val act: MainActivity) {
     @JavascriptInterface
     fun requestNotificationPermission() = act.askNotifPermission()
 
+    // ---------- gym rest timer ----------
+    @JavascriptInterface
+    fun restStart(seconds: Int, title: String, text: String) = RestTimer.start(act, seconds, title, text)
+
+    @JavascriptInterface
+    fun restCancel() = RestTimer.cancel(act)
+
+    /** A short buzz (tap feedback) or a long one. */
+    @JavascriptInterface
+    fun vibrate(long: Boolean) = RestTimer.vibrate(act, long)
+
     // ---------- automatic backup to the app's private storage ----------
     @JavascriptInterface
     fun autoBackup(json: String) {

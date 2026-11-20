@@ -300,6 +300,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        RestTimer.appVisible = false
         if (::web.isInitialized) {
             web.evaluateJavascript("window.appPause && window.appPause()", null)
             web.onPause() // stops animated backgrounds while the app is in the background
@@ -309,6 +310,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        RestTimer.appVisible = true
         if (::web.isInitialized) web.onResume()
     }
 
