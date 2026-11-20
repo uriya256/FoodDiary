@@ -16,6 +16,12 @@ jobs:
         run: |
           if [ -f FoodDiary-src.zip ]; then unzip -o -q FoodDiary-src.zip -d . ; fi
           ls -la
+      - name: Download OCR language files (Hebrew + English)
+        run: |
+          mkdir -p app/src/main/assets/tessdata
+          curl -fsSL -o app/src/main/assets/tessdata/heb.traineddata https://github.com/tesseract-ocr/tessdata_best/raw/main/heb.traineddata
+          curl -fsSL -o app/src/main/assets/tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata
+          ls -la app/src/main/assets/tessdata
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

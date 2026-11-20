@@ -75,6 +75,7 @@ const IC = {
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   sparkle: '<path class="d" d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15.5v4M17 17.5h4"/>',
   dice: '<rect class="d" x="4" y="4" width="16" height="16" rx="4.5"/><rect x="4" y="4" width="16" height="16" rx="4.5"/><g fill="currentColor" stroke="none"><circle cx="9" cy="9" r="1.4"/><circle cx="15" cy="15" r="1.4"/><circle cx="15" cy="9" r="1.4"/><circle cx="9" cy="15" r="1.4"/><circle cx="12" cy="12" r="1.4"/></g>',
+  camera: '<path class="d" d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
   globe: '<circle class="d" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/>',
   file: '<path class="d" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
 };
@@ -256,6 +257,15 @@ async function applyTheme() {
   document.documentElement.classList.toggle('dark', dark);
   const r = document.documentElement.style;
   r.setProperty('--accent', s.accent);
+  {
+    const hex = (s.accent || '#2F7D4F').replace('#', '');
+    const [R, G, B] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const mix = (t, k) => [R, G, B].map(c => Math.round(c + (t - c) * k));
+    const rgb = (a) => `rgb(${a.join(',')})`;
+    r.setProperty('--accent-light', rgb(mix(255, 0.3)));
+    r.setProperty('--accent-text', rgb(dark ? mix(255, 0.45) : mix(0, 0.2)));
+    for (const [name, a] of [['--accent-soft', .14], ['--a18', .18], ['--a38', .38], ['--a62', .62], ['--a22', .22], ['--a12', .12], ['--a08', .08]]) r.setProperty(name, `rgba(${R},${G},${B},${a})`);
+  }
   r.setProperty('--card-alpha', String(s.cardAlpha));
   r.setProperty('--blur', (s.blur || 0) + 'px');
   r.setProperty('--dim', String(s.dim || 0));
@@ -431,7 +441,7 @@ function viewToday() {
   </section>
   <div class="quick">
     <button class="btn" data-act="copyYesterday"><span class="qi" style="--q1:#7C9BFF;--q2:#5363D6">${icon('copy', 20)}</span>${tr('העתק מאתמול', 'Copy yesterday')}</button>
-    <button class="btn" data-act="openImport" data-mode="day"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('paste', 20)}</span>${tr('הדבק טקסט', 'Paste text')}</button>
+    <button class="btn" data-act="openImport" data-mode="day"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span>${tr('פתק או טקסט', 'Note or text')}</button>
     <button class="btn" data-act="shareDay"><span class="qi" style="--q1:#5EE0B2;--q2:#1E9C7A">${icon('share', 20)}</span>${tr('שתף את היום', 'Share day')}</button>
   </div>`;
 
@@ -872,6 +882,7 @@ function importHtml() {
     h += `<p class="small muted" style="margin:0">${isDay
       ? tr(`הדבק את מה שכתבת על ${longDate(S.date)}. כותרות כמו "בוקר:" ו"ערב:" מחלקות לארוחות.`, `Paste what you wrote for ${longDate(S.date)}. Headings like "Breakfast:" and "Dinner:" split it into meals.`)
       : tr('הדבק את כל הרשומות שכתבת. כל יום מתחיל בשורת תאריך (למשל 23/10/2026), וכל ארוחה בכותרת כמו "בוקר:".', 'Paste all your entries. Each day starts with a date line (e.g. 23/10/2026), and each meal with a heading like "Breakfast:".')}</p>
+      ${scanBoxHtml()}
       <textarea class="note" rows="10" data-on="impText" placeholder="${tr('23/10/2026 - יום שישי&#10;• בוקר: שלוש פרוסות לחם מלא, חביתה…&#10;• צהריים: …', '23/10/2026 - Friday&#10;• Breakfast: 2 slices of whole wheat bread, omelette…&#10;• Lunch: …')}">${esc(IMP.text)}</textarea>
       <label class="btn" role="button">${icon('file', 18)}${tr('בחירת קובץ טקסט', 'Choose a text file')}<input type="file" accept="text/plain" class="hidden" data-on="impFile"></label>`;
     h += `</div><footer><button class="btn primary big block" data-act="impParse">${tr('ניתוח הטקסט', 'Read the text')}</button></footer>`;
@@ -898,6 +909,31 @@ function importHtml() {
   if (r.days.length > IMP.showDays) h += `<button class="btn" data-act="impMore">${tr(`הצג עוד ${Math.min(20, r.days.length - IMP.showDays)} ימים`, `Show ${Math.min(20, r.days.length - IMP.showDays)} more days`)}</button>`;
   h += `</div><footer><button class="btn" data-act="impBack">${tr('עריכה', 'Edit')}</button><button class="btn primary big grow" data-act="impGo" ${r.days.length ? '' : 'disabled'}>${icon('check', 20)}${tr('ייבוא', 'Import')}</button></footer>`;
   return h;
+}
+function scanBoxHtml() {
+  const app = !!(A && A.ocrCamera);
+  return `<div class="scanbox">
+    <div class="row" style="gap:10px"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span><b class="grow">${tr('מפתק שכתבת ביד', 'From a handwritten note')}</b></div>
+    ${app ? `<button class="btn primary block" data-act="lens">${icon('sparkle', 18)}${tr('צלם עם Google Lens', 'Scan with Google Lens')}</button>
+    <div class="small muted">${tr('הכי מדויק לכתב יד. ב-Lens: מצלמים את הפתק, בוחרים "טקסט", מסמנים הכל ולוחצים "העתקה". כשחוזרים לכאן הטקסט נכנס לבד.', 'Most accurate for handwriting. In Lens: photograph the note, choose "Text", select all and tap "Copy". When you come back here the text is pasted for you.')}</div>
+    <div class="row" style="gap:8px">
+      <button class="btn grow" data-act="ocrCam">${icon('camera', 18)}${tr('צילום', 'Camera')}</button>
+      <button class="btn grow" data-act="ocrGal">${icon('image', 18)}${tr('מהגלריה', 'Gallery')}</button>
+    </div>
+    <div class="small muted">${tr('זיהוי בלי אינטרנט. עובד טוב רק עם אותיות דפוס ברורות; כתב יד מחובר כמעט לא יזוהה.', 'Offline recognition. Works well only with clear block letters; joined-up handwriting is rarely recognized.')}</div>` : ''}
+    <button class="btn soft block" data-act="pasteClip">${icon('paste', 18)}${tr('הדבק מהלוח', 'Paste from clipboard')}</button>
+  </div>
+  <div class="small muted">${tr('בכל דרך, הטקסט מופיע כאן למטה. בדוק ותקן אותו לפני הניתוח, כדי שיישמר בדיוק מה שכתבת.', 'Either way, the text appears below. Check and fix it before reading it in, so exactly what you wrote is saved.')}</div>`;
+}
+function setImportText(text, append) {
+  text = String(text || '').replace(/\r/g, '').trim();
+  if (!text) return false;
+  IMP.text = append && IMP.text.trim() ? IMP.text.trim() + '\n' + text : text;
+  IMP.result = null;
+  replaceSheetBody('import', importHtml());
+  const ta = $('[data-on="impText"]');
+  if (ta) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }
+  return true;
 }
 function applyMerges(d) {
   const out = clone(d);
@@ -1240,6 +1276,19 @@ const ACT = {
     toast(tr('נמחקה', 'Deleted'), { label: tr('ביטול', 'Undo'), fn: () => { db.templates.splice(i, 0, t); save(); replaceSheetBody('tpls', tplsHtml()); render({ keepScroll: true }); } });
   },
   openImport(el) { openImport(el.dataset.mode || 'history'); },
+  lens() {
+    if (!A || !A.openLens) return;
+    IMP.awaitClip = true;
+    IMP.clipBefore = A.readClipboard ? A.readClipboard() : '';
+    if (!A.openLens()) { IMP.awaitClip = false; toast(tr('Google Lens לא נמצא בטלפון. אפשר להשתמש בצילום האופליין', 'Google Lens was not found. You can use the offline camera instead')); }
+  },
+  ocrCam() { if (A && A.ocrCamera) A.ocrCamera(); },
+  ocrGal() { if (A && A.ocrGallery) A.ocrGallery(); },
+  async pasteClip() {
+    let t = '';
+    try { t = A && A.readClipboard ? A.readClipboard() : await navigator.clipboard.readText(); } catch (e) { }
+    if (!setImportText(t, true)) toast(tr('הלוח ריק', 'The clipboard is empty'));
+  },
   impParse() { if (!IMP.text.trim()) { toast(tr('אין טקסט', 'No text')); return; } runParse(); },
   impBack() { IMP.result = null; replaceSheetBody('import', importHtml()); },
   impConflict(el) { IMP.conflict = el.dataset.v; replaceSheetBody('import', importHtml()); },
@@ -1370,6 +1419,15 @@ window.setInsets = (top, bottom) => {
   document.documentElement.style.setProperty('--sab', bottom + 'px');
 };
 window.onSharedText = (text) => { while (sheetStack.length) closeSheet(); setTimeout(() => openImport(/\d{1,2}[\/.]\d{1,2}/.test(text) ? 'history' : 'day', text), 250); };
+window.onOcrStart = () => toast(tr('מזהה טקסט בתמונה…', 'Reading the photo…'));
+window.onOcrText = (text, status) => {
+  if (status === 'cancel') return;
+  if (status === 'nocamera') { toast(tr('לא נמצאה מצלמה', 'No camera found')); return; }
+  if (text == null) { toast(tr('הזיהוי נכשל. נסה תמונה חדה יותר', 'Recognition failed. Try a sharper photo')); return; }
+  if (!sheetStack.find(s => s.id === 'import')) openImport(IMP.mode || 'day');
+  if (setImportText(text, true)) toast(tr('זוהה טקסט. בדוק ותקן לפני הניתוח', 'Text found. Check and fix it before reading it in'));
+  else toast(tr('לא זוהה טקסט בתמונה', 'No text found in the photo'));
+};
 window.onNotifPermission = (ok) => { if (!ok) toast(tr('בלי הרשאת התראות התזכורת לא תופיע', "Without notification permission the reminder won't show")); };
 window.appPause = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); A && A.autoBackup && A.autoBackup(JSON.stringify(db)); } catch (e) { } };
 document.addEventListener('visibilitychange', () => {
@@ -1378,6 +1436,12 @@ document.addEventListener('visibilitychange', () => {
     const t = todayISO();
     if (S.lastSeen && S.lastSeen !== t && S.date === S.lastSeen) { S.date = t; render(); applyTheme(); }
     S.lastSeen = t;
+    if (IMP.awaitClip && A && A.readClipboard) {
+      setTimeout(() => {
+        const c = A.readClipboard();
+        if (c && c !== IMP.clipBefore) { IMP.awaitClip = false; setImportText(c, true); toast(tr('הטקסט מ-Lens נכנס. בדוק ותקן לפני הניתוח', 'Text from Lens pasted. Check and fix it before reading it in')); }
+      }, 700);
+    }
   }
 });
 

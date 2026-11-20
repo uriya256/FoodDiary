@@ -19,6 +19,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import android.content.ClipboardManager
+import android.content.Context
+import java.io.File
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -57,6 +61,73 @@ class MainActivity : ComponentActivity() {
     val saveJson = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { onSaved(it) }
     val saveText = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { onSaved(it) }
     val saveCsv = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { onSaved(it) }
+
+    // ---------- photo of a written note -> text ----------
+    private var photoUri: Uri? = null
+
+    private val takePhoto = registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val u = photoUri
+        if (ok && u != null) ocrFrom(u) else js("window.onOcrText && window.onOcrText(null, 'cancel')")
+    }
+    private val pickPhoto = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) ocrFrom(uri) else js("window.onOcrText && window.onOcrText(null, 'cancel')")
+    }
+
+    fun ocrCamera() {
+        runOnUiThread {
+            try {
+                val dir = File(cacheDir, "ocr").apply { mkdirs() }
+                val f = File(dir, "note.jpg")
+                val u = FileProvider.getUriForFile(this, "$packageName.files", f)
+                photoUri = u
+                takePhoto.launch(u)
+            } catch (e: Exception) {
+                js("window.onOcrText && window.onOcrText(null, 'nocamera')")
+            }
+        }
+    }
+
+    fun ocrGallery() {
+        runOnUiThread {
+            try { pickPhoto.launch("image/*") } catch (e: Exception) { js("window.onOcrText && window.onOcrText(null, 'error')") }
+        }
+    }
+
+    private fun ocrFrom(uri: Uri) {
+        js("window.onOcrStart && window.onOcrStart()")
+        Thread {
+            val result = try {
+                val bmp = Ocr.loadBitmap(this, uri)
+                if (bmp == null) null else Ocr.recognize(this, bmp)
+            } catch (e: Throwable) { null }
+            if (result == null) js("window.onOcrText && window.onOcrText(null, 'error')")
+            else js("window.onOcrText && window.onOcrText(" + JSONObject.quote(result) + ", 'ok')")
+        }.start()
+    }
+
+    fun openLens(): Boolean {
+        val tries = listOf(
+            Intent(Intent.ACTION_VIEW, Uri.parse("googleapp://lens")).setPackage("com.google.android.googlequicksearchbox"),
+            packageManager.getLaunchIntentForPackage("com.google.ar.lens"),
+            Intent(Intent.ACTION_VIEW, Uri.parse("google://lens")).setPackage("com.google.android.googlequicksearchbox")
+        )
+        for (i in tries) {
+            if (i == null) continue
+            try {
+                startActivity(i)
+                return true
+            } catch (_: Exception) { }
+        }
+        return false
+    }
+
+    fun readClipboard(): String {
+        return try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = cm.primaryClip
+            if (clip != null && clip.itemCount > 0) clip.getItemAt(0).coerceToText(this)?.toString() ?: "" else ""
+        } catch (_: Exception) { "" }
+    }
 
     val notifPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->

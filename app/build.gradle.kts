@@ -11,8 +11,12 @@ android {
         applicationId = "com.uriya.fooddiary"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
+        ndk {
+            // phones only: keeps the APK smaller (the OCR engine ships native code per CPU type)
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -29,6 +33,9 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    androidResources {
+        noCompress += "traineddata"
+    }
     lint {
         abortOnError = false
         checkReleaseBuilds = false
@@ -39,4 +46,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-ktx:1.9.3")
     implementation("androidx.webkit:webkit:1.12.1")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
 }

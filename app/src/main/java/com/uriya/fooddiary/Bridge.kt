@@ -64,6 +64,31 @@ class Bridge(private val act: MainActivity) {
     @JavascriptInterface
     fun setBars(bg: String, dark: Boolean) = act.setBars(bg, dark)
 
+    // ---------- reading a written note ----------
+    @JavascriptInterface
+    fun ocrCamera() = act.ocrCamera()
+
+    @JavascriptInterface
+    fun ocrGallery() = act.ocrGallery()
+
+    @JavascriptInterface
+    fun openLens(): Boolean {
+        var ok = false
+        val latch = java.util.concurrent.CountDownLatch(1)
+        act.runOnUiThread { ok = act.openLens(); latch.countDown() }
+        latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
+        return ok
+    }
+
+    @JavascriptInterface
+    fun readClipboard(): String {
+        var text = ""
+        val latch = java.util.concurrent.CountDownLatch(1)
+        act.runOnUiThread { text = act.readClipboard(); latch.countDown() }
+        latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
+        return text
+    }
+
     // ---------- reminders ----------
     @JavascriptInterface
     fun setReminder(enabled: Boolean, hour: Int, minute: Int) {
