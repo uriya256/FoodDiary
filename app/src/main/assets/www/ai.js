@@ -254,7 +254,7 @@ function aiSetupHtml() {
       <li>${tr('לחץ "Create API key" והעתק את המפתח', 'Tap "Create API key" and copy the key')}</li>
       <li>${tr('הדבק אותו כאן ולחץ "חיבור"', 'Paste it here and tap "Connect"')}</li>
     </ol>
-    <div class="row" style="gap:8px"><input class="search grow" type="text" data-on="aiKey" placeholder="AIza…" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr">
+    <div class="row" style="gap:8px"><input class="search grow" type="text" data-on="aiKey" placeholder="AQ.… / AIza…" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr">
       <button class="btn soft" data-act="aiPasteKey">${icon('paste', 18)}</button></div>
     <button class="btn primary big block" data-act="aiConnect">${icon('check', 20)}${tr('חיבור', 'Connect')}</button>
     <div class="small muted">${tr('השיחות, הזיכרון והמפתח נשמרים רק בטלפון. ההודעות והיומן נשלחים ל-Google כדי לקבל תשובה, ובגרסה החינמית Google עשויה להשתמש בהם לשיפור המוצרים שלה. המפתח לא נכלל בקובץ הגיבוי.', 'Chats, memory and the key stay on your phone. Messages and your diary are sent to Google to get answers, and on the free tier Google may use them to improve its products. The key is not included in backup files.')}</div>
@@ -308,7 +308,7 @@ function aiRun() {
       if ((code === 429 || code === 404 || code === 503) && !AI.triedFallback && s.fallback && model !== s.fallback) { AI.triedFallback = true; bot.raw = ''; go(s.fallback); return; }
       AI.busy = false; bot.error = true;
       bot.text = code === 429 ? tr('הגעת למגבלת השימוש החינמית לרגע. נסה שוב בעוד דקה.', 'You hit the free usage limit for now. Try again in a minute.')
-        : (code === 400 || code === 401 || code === 403) && /API_KEY|api key|PERMISSION/i.test(detail || '') ? tr('המפתח לא תקין. אפשר להחליף אותו בהגדרות › צ׳אט AI.', 'The key is not valid. You can replace it in Settings › AI chat.')
+        : (code === 401 || code === 403 || (code === 400 && /API_KEY|api key|PERMISSION|UNAUTHENTICATED|ACCESS_TOKEN/i.test(detail || ''))) ? tr('המפתח לא תקין. אפשר להחליף אותו בהגדרות › צ׳אט AI.', 'The key is not valid. You can replace it in Settings › AI chat.')
         : code === 0 ? tr('אין חיבור לאינטרנט. נסה שוב כשיש רשת.', 'No internet connection. Try again when you are online.')
         : tr(`משהו השתבש (${code}). נסה שוב.`, `Something went wrong (${code}). Try again.`);
       save(); if (S.tab === 'chat') { render({ keepScroll: true }); chatScrollBottom(true); }
@@ -346,8 +346,9 @@ function aiSettingsHtml() {
 const AI_ACT = {
   async aiConnect() {
     const inp = $('[data-on="aiKey"]');
-    const key = ((inp && inp.value) || '').trim().replace(/\s+/g, '');
-    if (!/^[A-Za-z0-9_\-]{20,}$/.test(key)) { toast(tr('זה לא נראה כמו מפתח. הוא מתחיל בדרך כלל ב-AIza', "That doesn't look like a key. It usually starts with AIza")); return; }
+    // Both key formats work: the new auth keys ("AQ.…") and the older ones ("AIza…")
+    const key = ((inp && inp.value) || '').trim().replace(/\s+/g, '').replace(/^["'`]+|["'`]+$/g, '');
+    if (!/^[A-Za-z0-9._\-]{20,300}$/.test(key)) { toast(tr('זה לא נראה כמו מפתח. הוא מתחיל בדרך כלל ב-AQ. או ב-AIza', "That doesn't look like a key. It usually starts with AQ. or AIza")); return; }
     const s = aiSet(); const old = s.key; s.key = key;
     toast(tr('בודק את המפתח…', 'Checking the key…'));
     const r = await aiPickModels();

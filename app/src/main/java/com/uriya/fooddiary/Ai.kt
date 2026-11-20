@@ -14,33 +14,41 @@ object Ai {
 
     private fun q(s: String) = JSONObject.quote(s)
 
+    private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
+
     fun stream(act: MainActivity, id: String, model: String, key: String, body: String) {
         if (!SAFE_MODEL.matches(model)) { act.js("window.onAiError && window.onAiError(${q(id)}, 404, 'bad model')"); return }
         Thread {
             var conn: HttpURLConnection? = null
             try {
-                conn = (URL("${BASE}models/$model:streamGenerateContent?alt=sse").openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    doOutput = true
-                    connectTimeout = 20000
-                    readTimeout = 120000
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    setRequestProperty("x-goog-api-key", key)
-                }
-                running[id] = conn
-                conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                val code = conn.responseCode
-                if (code !in 200..299) {
-                    val err = try { conn.errorStream?.bufferedReader(Charsets.UTF_8)?.readText() ?: "" } catch (_: Exception) { "" }
-                    act.js("window.onAiError && window.onAiError(${q(id)}, $code, ${q(err.take(2000))})")
-                } else {
-                    conn.inputStream.bufferedReader(Charsets.UTF_8).use { r ->
-                        while (true) {
-                            val line = r.readLine() ?: break
-                            if (line.startsWith("data:")) act.js("window.onAiChunk && window.onAiChunk(${q(id)}, ${q(line.substring(5).trim())})")
-                        }
+                // The key goes in the x-goog-api-key header; if Google refuses that, try once with ?key= (works for both "AQ." and "AIza" keys)
+                for (attempt in 0..1) {
+                    val viaQuery = attempt == 1
+                    conn = (URL("${BASE}models/$model:streamGenerateContent?alt=sse" + (if (viaQuery) "&key=" + enc(key) else "")).openConnection() as HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        doOutput = true
+                        connectTimeout = 20000
+                        readTimeout = 120000
+                        setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                        if (!viaQuery) setRequestProperty("x-goog-api-key", key)
                     }
-                    act.js("window.onAiDone && window.onAiDone(${q(id)})")
+                    running[id] = conn!!
+                    conn!!.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                    val code = conn!!.responseCode
+                    if (code !in 200..299) {
+                        val err = try { conn!!.errorStream?.bufferedReader(Charsets.UTF_8)?.readText() ?: "" } catch (_: Exception) { "" }
+                        if (!viaQuery && (code == 401 || code == 403) && running.containsKey(id)) { conn!!.disconnect(); continue }
+                        act.js("window.onAiError && window.onAiError(${q(id)}, $code, ${q(err.take(2000))})")
+                    } else {
+                        conn!!.inputStream.bufferedReader(Charsets.UTF_8).use { r ->
+                            while (true) {
+                                val line = r.readLine() ?: break
+                                if (line.startsWith("data:")) act.js("window.onAiChunk && window.onAiChunk(${q(id)}, ${q(line.substring(5).trim())})")
+                            }
+                        }
+                        act.js("window.onAiDone && window.onAiDone(${q(id)})")
+                    }
+                    break
                 }
             } catch (e: Exception) {
                 if (running.containsKey(id)) act.js("window.onAiError && window.onAiError(${q(id)}, 0, ${q(e.toString())})")
@@ -54,22 +62,28 @@ object Ai {
     fun get(act: MainActivity, id: String, path: String, key: String) {
         if (!SAFE_PATH.matches(path)) { act.js("window.onAiHttp && window.onAiHttp(${q(id)}, 400, '')"); return }
         Thread {
-            var conn: HttpURLConnection? = null
+            var code = 0
+            var text = ""
             try {
-                conn = (URL(BASE + path).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 20000
-                    readTimeout = 30000
-                    setRequestProperty("x-goog-api-key", key)
+                for (attempt in 0..1) {
+                    val viaQuery = attempt == 1
+                    val url = BASE + path + (if (viaQuery) (if (path.contains("?")) "&" else "?") + "key=" + enc(key) else "")
+                    val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 20000
+                        readTimeout = 30000
+                        if (!viaQuery) setRequestProperty("x-goog-api-key", key)
+                    }
+                    try {
+                        code = conn.responseCode
+                        text = try {
+                            (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader(Charsets.UTF_8)?.readText() ?: ""
+                        } catch (_: Exception) { "" }
+                    } finally { conn.disconnect() }
+                    if (viaQuery || (code != 401 && code != 403)) break
                 }
-                val code = conn.responseCode
-                val text = try {
-                    (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader(Charsets.UTF_8)?.readText() ?: ""
-                } catch (_: Exception) { "" }
                 act.js("window.onAiHttp && window.onAiHttp(${q(id)}, $code, ${q(text)})")
             } catch (e: Exception) {
                 act.js("window.onAiHttp && window.onAiHttp(${q(id)}, 0, ${q(e.toString())})")
-            } finally {
-                conn?.disconnect()
             }
         }.start()
     }
