@@ -75,6 +75,8 @@ const IC = {
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   sparkle: '<path class="d" d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15.5v4M17 17.5h4"/>',
   dice: '<rect class="d" x="4" y="4" width="16" height="16" rx="4.5"/><rect x="4" y="4" width="16" height="16" rx="4.5"/><g fill="currentColor" stroke="none"><circle cx="9" cy="9" r="1.4"/><circle cx="15" cy="15" r="1.4"/><circle cx="15" cy="9" r="1.4"/><circle cx="9" cy="15" r="1.4"/><circle cx="12" cy="12" r="1.4"/></g>',
+  bottle: '<path class="d" d="M9 7h6v2c2 1 3 2.5 3 4.5V20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6.5C6 11.5 7 10 9 9z"/><path d="M9 7h6v2c2 1 3 2.5 3 4.5V20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6.5C6 11.5 7 10 9 9z"/><path d="M9.5 3h5v4h-5z"/><path d="M6 15h12"/>',
+  star: '<path class="d" d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9z"/><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9z"/>',
   camera: '<path class="d" d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
   globe: '<circle class="d" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/>',
   file: '<path class="d" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
@@ -116,7 +118,7 @@ function freshDb() {
     v: 1, days: {}, foods: {}, aliases: {}, templates: [],
     settings: {
       theme: 'auto', accent: '#2F7D4F', bg: 'sage', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false, motion: true,
-      showWater: true, waterGoal: 8, reminder: { on: false, h: 21, m: 0 },
+      showWater: true, water: WATER_DEFAULTS(), reminder: { on: false, h: 21, m: 0 },
       lang: /^(he|iw)/i.test(navigator.language || 'he') ? 'he' : 'en',
     },
   };
@@ -134,6 +136,8 @@ function loadDb() {
       db = Object.assign(f, d);
       db.settings = Object.assign(f.settings, d.settings || {});
       if (!d.settings || !d.settings.lang) db.settings.lang = 'he';
+      if (!d.settings || !d.settings.water) delete db.settings.water;
+      migrateWater();
       db.settings.reminder = Object.assign({ on: false, h: 21, m: 0 }, (d.settings || {}).reminder || {});
     } catch (e) { db = freshDb(); }
   }
@@ -152,12 +156,13 @@ function reportToday() {
     const n = d ? MEALS.filter(m => (d.meals[m] || []).length).length : 0;
     A && A.setDayStatus && A.setDayStatus(t, n);
   } catch (e) { }
+  syncWaterNative();
 }
 
 function getDay(iso, create) {
   let d = db.days[iso];
   if (!d && create) {
-    d = db.days[iso] = { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, mealNotes: {}, water: 0, note: '' };
+    d = db.days[iso] = { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, mealNotes: {}, drinks: [], note: '' };
   }
   if (d) {
     d.meals = d.meals || {};
@@ -166,7 +171,9 @@ function getDay(iso, create) {
   }
   return d;
 }
-function dayHasData(d) { return d && (MEALS.some(m => d.meals[m] && d.meals[m].length) || d.water || d.note); }
+function dayHasData(d) { return d && (MEALS.some(m => d.meals[m] && d.meals[m].length) || (d.drinks && d.drinks.length) || d.note); }
+/** A day as text, in the same format the user writes (water as litres). */
+function dayText(iso, d) { d = d || db.days[iso]; return P.dayToText(iso, Object.assign({}, d, { waterMl: drinksMl(d) })); }
 function mealsCount(d) { return d ? MEALS.filter(m => d.meals[m] && d.meals[m].length).length : 0; }
 function cleanupDay(iso) { const d = db.days[iso]; if (d && !dayHasData(d) && !Object.values(d.mealNotes || {}).some(Boolean)) delete db.days[iso]; }
 
@@ -400,6 +407,7 @@ function render(opts = {}) {
   if (opts.anim) { sc.classList.remove('swap'); void sc.offsetWidth; sc.classList.add('swap'); }
   sc.scrollTop = keepScroll;
   if (!opts.anim) $$('.card, .chip', sc).forEach(el => { el.style.animation = 'none'; });
+  if (S.tab === 'today') animateBottle();
 }
 
 /* ---------------- view: today ---------------- */
@@ -465,13 +473,7 @@ function viewToday() {
     h += `</section>`;
   }
 
-  if (db.settings.showWater) {
-    const w = (day && day.water) || 0;
-    const goal = db.settings.waterGoal || 8;
-    const n = Math.max(goal, w + (w >= goal ? 1 : 0));
-    h += `<section class="card"><div class="row between"><h2 class="row">${icon('drop', 20, 'style="color:#2C8FB5"')}${tr('מים', 'Water')}</h2><span class="muted small">${tr(`${w} מתוך ${goal} כוסות`, `${w} of ${goal} glasses`)}</span></div>
-      <div class="water">${Array.from({ length: n }, (_, i) => `<button class="cup ${i < w ? 'on' : ''}" data-act="water" data-n="${i + 1}" aria-label="${i + 1} ${tr('כוסות', 'glasses')}">${icon('glass', 28, i < w ? 'fill="currentColor" fill-opacity=".25"' : '')}</button>`).join('')}</div></section>`;
-  }
+  if (db.settings.showWater) h += waterCardHtml(iso);
   h += `<section class="card"><h3 class="row">${icon('note', 18)}${tr('הערות על היום', 'Notes for the day')}</h3>
     <textarea class="note" rows="2" data-on="dayNote" placeholder="${tr('איך הרגשת, אכלת בחוץ, משהו מיוחד…', 'How you felt, ate out, anything special…')}">${esc((day && day.note) || '')}</textarea></section>`;
   return h;
@@ -495,7 +497,7 @@ function viewHistory() {
   }
   const logged = Object.keys(db.days).filter(k => dayHasData(db.days[k])).sort().reverse();
   let list = logged;
-  if (q) list = logged.filter(iso => P.dayToText(iso, db.days[iso]).split('\n').slice(1).some(l => nk(l).includes(qk)));
+  if (q) list = logged.filter(iso => dayText(iso).split('\n').slice(1).some(l => nk(l).includes(qk)));
   const total = list.length;
   list = list.slice(0, S.histLimit);
   const hl = (s) => {
@@ -522,7 +524,8 @@ function viewHistory() {
   for (const iso of list) {
     const d = db.days[iso];
     const lines = MEALS.filter(m => d.meals[m].length).map(m => `<span><b>${MEAL[m].label}:</b> ${hl(d.meals[m].map(it => P.formatItem(it, { short: true })).join(', '))}</span>`);
-    if (d.water) lines.push(`<span><b>${tr('מים', 'Water')}:</b> ${d.water} ${tr('כוסות', 'glasses')}</span>`);
+    const wml = dayWaterMl(d);
+    if (wml) lines.push(`<span><b>${tr('מים', 'Water')}:</b> ${fmtAmount(wml)}${wml >= W().goalMl ? ' ✓' : ''}</span>`);
     h += `<button class="card dayitem" data-act="openDay" data-date="${iso}">
       <div class="row between"><span style="font-weight:700">${tr('יום ', '')}${P.weekdayName(iso)}, ${shortDate(iso)}</span><span class="small muted">${P.displayDate(iso)}</span></div>
       <div class="lines">${lines.join('')}</div></button>`;
@@ -549,11 +552,12 @@ function viewStats() {
   const meal = S.statsMeal;
   const counts = {};
   const catDays = {};
-  let water = 0, waterDays = 0, mealsTotal = 0;
+  let water = 0, waterDays = 0, waterHit = 0, mealsTotal = 0;
   for (const iso of logged) {
     const d = db.days[iso];
     const seenCats = new Set();
-    if (d.water) { water += d.water; waterDays++; }
+    const wml = dayWaterMl(d);
+    if (wml) { water += wml; waterDays++; if (wml >= W().goalMl) waterHit++; }
     mealsTotal += mealsCount(d);
     for (const m of MEALS) for (const it of d.meals[m]) {
       [it.name].concat(it.with || []).forEach(n => {
@@ -576,7 +580,7 @@ function viewStats() {
     <div class="card tile"><div class="big">${logged.length}<span class="small muted"> / ${dates.length}</span></div><div class="lbl">${tr('ימים רשומים', 'days logged')}</div></div>
     <div class="card tile"><div class="big" style="color:#B85C1E">${streak()}</div><div class="lbl">${tr('ימים ברצף', 'day streak')}</div></div>
     <div class="card tile"><div class="big">${(mealsTotal / logged.length).toFixed(1)}</div><div class="lbl">${tr('ארוחות ביום בממוצע', 'meals per day (avg)')}</div></div>
-    <div class="card tile"><div class="big" style="color:#2C8FB5">${waterDays ? (water / waterDays).toFixed(1) : '–'}</div><div class="lbl">${tr('כוסות מים ביום', 'glasses of water a day')}</div></div>
+    <div class="card tile"><div class="big" style="color:#2C8FB5">${waterDays ? fmtL(water / waterDays) : '–'}<span class="small muted"> ${tr('ל׳', 'L')}</span></div><div class="lbl">${tr(`מים ביום · ${waterHit} ימים ביעד`, `water a day · ${waterHit} ${waterHit === 1 ? 'day' : 'days'} on goal`)}</div></div>
   </div>
   <section class="card"><h3>${tr('באילו ימים היה…', 'Days that included…')}</h3><div class="stack">`;
   const catOrder = Object.keys(FD.CATEGORIES).filter(c => catDays[c]).sort((a, b) => catDays[b] - catDays[a]);
@@ -655,12 +659,7 @@ function viewSettings() {
     <label class="field ${r.on ? '' : 'hidden'}"><span>${tr('שעה', 'Time')}</span><input type="time" value="${pad(r.h)}:${pad(r.m)}" data-on="remTime"></label>
     ${A ? '' : `<div class="small muted">${tr('תזכורות עובדות באפליקציה המותקנת בטלפון.', 'Reminders work in the app installed on your phone.')}</div>`}
   </section>
-  <section class="card stack">
-    <h2 class="row">${icon('drop', 20)}${tr('מים', 'Water')}</h2>
-    <div class="row between"><span>${tr('הצג מעקב מים', 'Show water tracker')}</span>${sw('showWater', s.showWater, tr('הצג מעקב מים', 'Show water tracker'))}</div>
-    <div class="row between ${s.showWater ? '' : 'hidden'}"><span>${tr('יעד כוסות ביום', 'Daily goal (glasses)')}</span>
-      <div class="stepper"><button class="iconbtn plain" data-act="waterGoal" data-d="-1" aria-label="${tr('פחות', 'Less')}">${icon('minus', 18)}</button><span class="val">${s.waterGoal}</span><button class="iconbtn plain" data-act="waterGoal" data-d="1" aria-label="${tr('יותר', 'More')}">${icon('plus', 18)}</button></div></div>
-  </section>
+  ${waterSettingsHtml()}
   <section class="card">
     <h2 class="row" style="margin-bottom:4px">${icon('list', 20)}${tr('מאכלים וארוחות', 'Foods and meals')}</h2>
     <div class="list">
@@ -904,7 +903,8 @@ function importHtml() {
   }
   h += `<div class="section-t">${tr('תצוגה מקדימה', 'Preview')}</div>`;
   r.days.slice(0, IMP.showDays).forEach(d => {
-    h += `<div class="importday">${esc(P.dayToText(d.date, applyMerges(d)))}${d.note ? '' : ''}</div>`;
+    const pd = applyMerges(d);
+    h += `<div class="importday">${esc(P.dayToText(d.date, Object.assign(pd, { waterMl: waterRawToMl(d.waterRaw) })))}</div>`;
   });
   if (r.days.length > IMP.showDays) h += `<button class="btn" data-act="impMore">${tr(`הצג עוד ${Math.min(20, r.days.length - IMP.showDays)} ימים`, `Show ${Math.min(20, r.days.length - IMP.showDays)} more days`)}</button>`;
   h += `</div><footer><button class="btn" data-act="impBack">${tr('עריכה', 'Edit')}</button><button class="btn primary big grow" data-act="impGo" ${r.days.length ? '' : 'disabled'}>${icon('check', 20)}${tr('ייבוא', 'Import')}</button></footer>`;
@@ -965,7 +965,8 @@ function doImport() {
       });
     });
     if (d.note) day.note = day.note ? day.note + '\n' + d.note : d.note;
-    if (d.water && (!day.water || IMP.conflict === 'replace')) day.water = d.water;
+    const wml = waterRawToMl(d.waterRaw);
+    if (wml && (!drinksMl(day) || IMP.conflict === 'replace')) day.drinks = [{ t: null, ml: Math.round(wml) }];
     nDays++;
   }
   save();
@@ -1043,7 +1044,8 @@ function csvOf(dates) {
   dates.forEach(iso => {
     const d = db.days[iso]; if (!d) return;
     MEALS.forEach(m => d.meals[m].forEach(it => rows.push([P.displayDate(iso), P.weekdayName(iso), MEAL[m].label, it.name, it.qty == null ? '' : it.qty, it.unit ? P.unitName(it.unit) : '', (it.with || []).join(' + '), it.note || '', catLabel(catOf(it.name))])));
-    if (d.water) rows.push([P.displayDate(iso), P.weekdayName(iso), tr('מים', 'Water'), tr('מים', 'Water'), d.water, tr('כוסות', 'glasses'), '', '', catLabel('drink')]);
+    const wml = drinksMl(d);
+    if (wml) rows.push([P.displayDate(iso), P.weekdayName(iso), tr('מים', 'Water'), tr('מים', 'Water'), wml, tr('מ״ל', 'ml'), '', '', catLabel('drink')]);
   });
   return '﻿' + rows.map(r => r.map(c => { const s = String(c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
 }
@@ -1199,13 +1201,7 @@ const ACT = {
   shareDay() {
     const d = getDay(S.date, false);
     if (!dayHasData(d)) { toast(tr('אין עדיין מה לשתף', 'Nothing to share yet')); return; }
-    shareText(P.dayToText(S.date, d));
-  },
-  water(el) {
-    const day = getDay(S.date, true);
-    const n = +el.dataset.n;
-    day.water = day.water === n ? n - 1 : n;
-    cleanupDay(S.date); save(); render({ keepScroll: true });
+    shareText(dayText(S.date, d));
   },
   openDay(el) { setDate(el.dataset.date); },
   histMonth(el) {
@@ -1217,9 +1213,9 @@ const ACT = {
   histMore() { S.histLimit += 40; render({ keepScroll: true }); },
   statsRange(el) { S.statsRange = +el.dataset.v; render({ keepScroll: true }); },
   statsMeal(el) { S.statsMeal = el.dataset.v; render({ keepScroll: true }); },
-  sharePeriod() { shareText(rangeDates().filter(i => dayHasData(db.days[i])).map(i => P.dayToText(i, db.days[i])).join('\n\n')); },
+  sharePeriod() { shareText(rangeDates().filter(i => dayHasData(db.days[i])).map(i => dayText(i)).join('\n\n')); },
   exportCsv() { const ds = S.tab === 'stats' ? rangeDates().filter(i => db.days[i]) : allDatesSorted(); exportFile(`food-diary-${todayISO()}.csv`, csvOf(ds), 'csv'); },
-  exportText() { exportFile(`food-diary-${todayISO()}.txt`, allDatesSorted().map(i => P.dayToText(i, db.days[i])).join('\n\n'), 'text'); },
+  exportText() { exportFile(`food-diary-${todayISO()}.txt`, allDatesSorted().map(i => dayText(i)).join('\n\n'), 'text'); },
   backup() { exportFile(`food-diary-backup-${todayISO()}.json`, JSON.stringify(db, null, 1), 'json'); },
   wipe() {
     confirmSheet(tr('מחיקת כל הנתונים', 'Delete all data'), tr('כל הימים, המאכלים והארוחות השמורות יימחקו. כדאי לשמור גיבוי קודם.', 'All days, foods and saved meals will be deleted. Consider saving a backup first.'), tr('מחק הכל', 'Delete all'), () => {
@@ -1247,7 +1243,73 @@ const ACT = {
   motion() { db.settings.motion = db.settings.motion === false; save(); applyTheme(); render({ keepScroll: true }); },
   rotateBg() { db.settings.rotateBg = !db.settings.rotateBg; save(); applyTheme(); render({ keepScroll: true }); },
   showWater() { db.settings.showWater = !db.settings.showWater; save(); render({ keepScroll: true }); },
-  waterGoal(el) { db.settings.waterGoal = Math.max(1, Math.min(20, db.settings.waterGoal + (+el.dataset.d))); save(); render({ keepScroll: true }); },
+  drink(el) { addDrink(S.date, +el.dataset.ml); render({ keepScroll: true }); },
+  undoDrink() {
+    const d = getDay(S.date, false);
+    if (!d || !d.drinks || !d.drinks.length) return;
+    S.waterAnimFrom = dayWaterMl(d) / W().goalMl; S.waterAnimDate = S.date;
+    const x = d.drinks.pop(); cleanupDay(S.date); save(); render({ keepScroll: true });
+    toast(tr(`בוטל: ${fmtAmount(x.ml)}`, `Removed ${fmtAmount(x.ml)}`));
+  },
+  openDrinks() { openDrinks(); },
+  drinkSrc(el) {
+    DRINK.src = el.dataset.id;
+    const x = drinkSources().find(y => y.id === DRINK.src);
+    DRINK.frac = 1; DRINK.ml = x ? x.ml : 250;
+    replaceSheetBody('drinks', drinksHtml());
+  },
+  drinkFrac(el) {
+    DRINK.frac = +el.dataset.v;
+    const x = drinkSources().find(y => y.id === DRINK.src);
+    DRINK.ml = roundMl((x ? x.ml : 250) * DRINK.frac);
+    $$('[data-act="drinkFrac"]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.v === DRINK.frac));
+    updateDrinkLabels();
+  },
+  drinkAdd() { addDrink(S.date, DRINK.ml); replaceSheetBody('drinks', drinksHtml()); },
+  delDrink(el) {
+    const d = getDay(S.date, false); if (!d || !d.drinks) return;
+    d.drinks.splice(+el.dataset.i, 1); cleanupDay(S.date); save(); replaceSheetBody('drinks', drinksHtml());
+  },
+  addBottle() { bottleSheet(null); },
+  editBottle(el) { bottleSheet(el.dataset.id); },
+  delBottle(el) {
+    const w = W(); const b = w.bottles.find(x => x.id === el.dataset.id);
+    confirmSheet(tr('מחיקת בקבוק', 'Delete bottle'), tr(`למחוק את "${esc(bottleName(b))}"?`, `Delete "${esc(bottleName(b))}"?`), tr('מחק', 'Delete'), () => {
+      w.bottles = w.bottles.filter(x => x.id !== b.id); W(); save(); render({ keepScroll: true });
+    });
+  },
+  wMain(el) { W().mainBottle = el.dataset.id; save(); render({ keepScroll: true }); },
+  bPreset(el) { const i = $('[data-on="bMl"]'); if (i) i.value = el.dataset.v; },
+  bSave(el) {
+    const w = W();
+    const name = (($('[data-on="bName"]') || {}).value || '').trim();
+    const ml = Math.max(50, Math.min(5000, Math.round(+(($('[data-on="bMl"]') || {}).value) || 0)));
+    if (!ml) { toast(tr('צריך נפח', 'Size is needed')); return; }
+    const id = el.dataset.id;
+    if (id) { const b = w.bottles.find(x => x.id === id); if (b) { b.name = name; b.ml = ml; } }
+    else { const nb = { id: 'b' + uid(), name, ml }; w.bottles.push(nb); if (sheetStack.find(x => x.id === 'drinks')) { DRINK.src = nb.id; DRINK.frac = 1; DRINK.ml = ml; } }
+    save(); closeSheet();
+    if (sheetStack.find(x => x.id === 'drinks')) replaceSheetBody('drinks', drinksHtml()); else render({ keepScroll: true });
+  },
+  wGoal(el) { const w = W(); w.goalMl = Math.max(500, Math.min(6000, w.goalMl + (+el.dataset.d))); save(); render({ keepScroll: true }); },
+  wCup(el) { const w = W(); w.cupMl = Math.max(100, Math.min(600, w.cupMl + (+el.dataset.d))); save(); render({ keepScroll: true }); },
+  wSuggest() {
+    promptSheet(tr('הצעת יעד מים', 'Suggest a water goal'), tr('המשקל שלך (ק״ג)', 'Your weight (kg)'), '', (v) => {
+      const kg = parseFloat(String(v).replace(',', '.'));
+      if (!(kg > 25 && kg < 250)) { toast(tr('לא הבנתי את המשקל', "I didn't get the weight")); return; }
+      const ml = Math.max(1500, Math.min(4000, Math.round(kg * 33 / 250) * 250));
+      W().goalMl = ml; save(); render({ keepScroll: true });
+      toast(tr(`היעד עודכן ל-${fmtL(ml)} ליטר. זו הערכה כללית; בחום או בפעילות צריך יותר`, `Goal set to ${fmtL(ml)} L. A rough guide; you need more in heat or when active`));
+    }, tr('חשב', 'Calculate'));
+    setTimeout(() => { const i = $('[data-on="promptVal"]'); if (i) i.setAttribute('inputmode', 'decimal'); }, 50);
+  },
+  wRemind() {
+    const w = W(); w.remind = !w.remind; save(); render({ keepScroll: true });
+    if (w.remind && A && A.requestNotificationPermission) A.requestNotificationPermission();
+    toast(w.remind ? tr('אזכיר לך לשתות רק כשתהיה מאחור', "I'll remind you only when you fall behind") : tr('תזכורת השתייה כובתה', 'Water reminder turned off'));
+  },
+  wEvery(el) { W().remindEvery = +el.dataset.v; save(); render({ keepScroll: true }); },
+  wMeals() { const w = W(); w.countMeals = !w.countMeals; save(); render({ keepScroll: true }); },
   reminder() {
     const r = db.settings.reminder;
     r.on = !r.on; save(); render({ keepScroll: true });
@@ -1334,6 +1396,11 @@ const ON = {
     save(); toast(tr(`"${n}" עבר ל${catLabel(el.value)}`, `"${n}" moved to ${catLabel(el.value)}`));
   },
   promptVal() { },
+  drinkMl(el) { DRINK.ml = +el.value; updateDrinkLabels(); },
+  wWake(el) { W().wake = el.value || '07:00'; save(); },
+  wSleep(el) { W().sleep = el.value || '23:00'; save(); },
+  bName() { },
+  bMl() { },
 };
 const saveLater = debounce(() => save(), 400);
 const FILE_ON = {
@@ -1362,6 +1429,8 @@ const FILE_ON = {
         confirmSheet(tr('שחזור מגיבוי', 'Restore from backup'), tr(`בגיבוי יש ${Object.keys(d.days).length} ימים. הנתונים הנוכחיים יוחלפו.`, `The backup has ${Object.keys(d.days).length} days. Your current data will be replaced.`), tr('שחזר', 'Restore'), () => {
           const f2 = freshDb();
           db = Object.assign(f2, d); db.settings = Object.assign(f2.settings, d.settings || {});
+          if (!d.settings || !d.settings.water) delete db.settings.water;
+          migrateWater();
           setLang(db.settings.lang); save(); applyTheme(); render(); toast(tr('השחזור הושלם', 'Restore complete'));
         }, false);
       } catch (e) { toast(tr('הקובץ לא נראה כמו גיבוי של יומן אוכל', "This file doesn't look like a Food Diary backup")); }
@@ -1436,6 +1505,8 @@ document.addEventListener('visibilitychange', () => {
     const t = todayISO();
     if (S.lastSeen && S.lastSeen !== t && S.date === S.lastSeen) { S.date = t; render(); applyTheme(); }
     S.lastSeen = t;
+    if (pullPendingWater() && S.tab === 'today') render({ keepScroll: true });
+    if (S.tab === 'today' && !sheetStack.length) render({ keepScroll: true });
     if (IMP.awaitClip && A && A.readClipboard) {
       setTimeout(() => {
         const c = A.readClipboard();
@@ -1452,6 +1523,7 @@ document.addEventListener('visibilitychange', () => {
   S.lastSeen = todayISO();
   await loadCustomBgs();
   await applyTheme();
+  pullPendingWater();
   render({ anim: true });
   reportToday();
   if (A && db.settings.reminder.on) { try { A.setReminder(true, db.settings.reminder.h, db.settings.reminder.m); } catch (e) { } }

@@ -83,5 +83,6 @@ class ReminderReceiver : BroadcastReceiver() {
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         Reminders.schedule(ctx)
+        WaterReminders.schedule(ctx)
     }
 }

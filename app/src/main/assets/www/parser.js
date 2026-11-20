@@ -192,7 +192,7 @@
   };
   const MEAL_RE_EN = /^(breakfast|brunch|lunch|dinner|supper|snacks?|dessert)(?:\s*[:\-–]\s*|\s+|$)(.*)$/i;
   const MEAL_MAP_EN = { breakfast: 'breakfast', brunch: 'breakfast', lunch: 'lunch', dinner: 'dinner', supper: 'dinner', snack: 'snack', snacks: 'snack', dessert: 'snack' };
-  const WATER_RE = /^(?:מים|water)\s*[:\-–]\s*(\d+)/i;
+  const WATER_RE = /^(?:מים|water)\s*[:\-–]\s*(\d+(?:[.,]\d+)?)\s*([^\s\d]*)/i;
   const NOTES_RE = /^(?:הערות|notes?)\s*[:\-–]\s*(.*)$/i;
   const DATE_RE = /^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?(?!\d)(.*)$/;
 
@@ -244,7 +244,7 @@
         }
       }
       const wm = line.match(WATER_RE);
-      if (wm && day) { day.water = +wm[1]; continue; }
+      if (wm && day) { day.waterRaw = { n: parseFloat(wm[1].replace(',', '.')), unit: (wm[2] || '').replace(/[.,;]+$/, '') }; continue; }
       const nm = line.match(NOTES_RE);
       if (nm && day) { day.note = day.note ? day.note + '\n' + nm[1] : nm[1]; continue; }
       let mm = line.match(MEAL_RE);
@@ -353,7 +353,10 @@
       if (day.mealNotes && day.mealNotes[k]) line += ` (${day.mealNotes[k]})`;
       out.push(line);
     }
-    if (day.water) out.push(en ? `• Water: ${day.water} glasses` : `• מים: ${day.water} כוסות`);
+    if (day.waterMl) {
+      const l = Math.round(day.waterMl / 10) / 100;
+      out.push(en ? `• Water: ${l} L` : `• מים: ${l} ליטר`);
+    } else if (day.water) out.push(en ? `• Water: ${day.water} glasses` : `• מים: ${day.water} כוסות`);
     if (day.note) out.push(en ? `• Notes: ${day.note}` : `• הערות: ${day.note}`);
     return out.join('\n');
   }

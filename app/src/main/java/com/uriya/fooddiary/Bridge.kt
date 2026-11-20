@@ -106,6 +106,21 @@ class Bridge(private val act: MainActivity) {
         prefs.edit().putString("status_date", date).putInt("status_meals", meals).apply()
     }
 
+    // ---------- water ----------
+    @JavascriptInterface
+    fun setWaterStatus(date: String, ml: Int, goal: Int, cup: Int) {
+        prefs.edit().putString("w_date", date).putInt("w_ml", ml).putInt("w_goal", goal).putInt("w_cup", cup).apply()
+    }
+
+    @JavascriptInterface
+    fun setWaterReminder(on: Boolean, wakeMin: Int, sleepMin: Int, everyMin: Int) {
+        prefs.edit().putBoolean("wr_on", on).putInt("wr_wake", wakeMin).putInt("wr_sleep", sleepMin).putInt("wr_every", everyMin).apply()
+        WaterReminders.schedule(act)
+    }
+
+    @JavascriptInterface
+    fun takePendingWater(): String = WaterReminders.takePending(act)
+
     @JavascriptInterface
     fun hasNotificationPermission(): Boolean = act.hasNotifPermission()
 
