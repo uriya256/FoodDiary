@@ -577,3 +577,7 @@ button.li { width: 100%; border: none; background: none; text-align: start; colo
 .mbar i { font-style: normal; }
 .mealnut .mbar { height: 18px; }
 .mealnut .mbar i b { display: inline; font-size: 10.5px; }
+.aact.warn { background: rgba(230, 150, 40, .16); color: #9A5A0C; }
+html.dark .aact.warn { color: #F2C46B; }
+.aact b { font-weight: 700; }
+.li.cur { background: var(--a08); border-radius: 14px; padding-inline: 8px; }

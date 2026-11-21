@@ -6,11 +6,53 @@
 const AI_BASE = 'https://generativelanguage.googleapis.com/v1beta/';
 const AI = { busy: false, reqId: null, streamText: '', model: null, triedFallback: false, onDone: null };
 
+/* Several conversations ("pages"). db.ai.chats holds them; aiDb().messages is the open one. */
+const AI_MAX_CHATS = 40;
 function aiDb() {
-  if (!db.ai) db.ai = { messages: [], memory: [] };
-  db.ai.messages = db.ai.messages || [];
-  db.ai.memory = db.ai.memory || [];
-  return db.ai;
+  if (!db.ai || typeof db.ai !== 'object') db.ai = { memory: [] };
+  const ai = db.ai;
+  ai.memory = ai.memory || [];
+  const desc = Object.getOwnPropertyDescriptor(ai, 'messages');
+  if (!Array.isArray(ai.chats) || (desc && !desc.get)) {
+    // older versions kept one chat in db.ai.messages
+    const old = desc && !desc.get && Array.isArray(ai.messages) ? ai.messages : [];
+    delete ai.messages;
+    if (!Array.isArray(ai.chats)) ai.chats = [];
+    if (old.length) { const c = { id: 'c' + uid(), t: old[0].t || new Date().toISOString(), messages: old }; ai.chats.push(c); ai.cur = c.id; }
+  }
+  if (!Object.getOwnPropertyDescriptor(ai, 'messages')) {
+    Object.defineProperty(ai, 'messages', { enumerable: false, configurable: true, get() { return curChat().messages; }, set(v) { curChat().messages = v; } });
+  }
+  return ai;
+}
+function curChat() {
+  const ai = db.ai;
+  let c = ai.chats.find(x => x.id === ai.cur);
+  if (!c) {
+    c = ai.chats[ai.chats.length - 1];
+    if (!c) { c = { id: 'c' + uid(), t: new Date().toISOString(), messages: [] }; ai.chats.push(c); }
+    ai.cur = c.id;
+  }
+  if (!Array.isArray(c.messages)) c.messages = [];
+  return c;
+}
+function chatTitle(c) {
+  if (c.title) return c.title;
+  const first = (c.messages || []).find(m => m.role === 'user' && m.text);
+  if (!first) return tr('שיחה חדשה', 'New chat');
+  const t = first.text.replace(/\s+/g, ' ').trim();
+  return t.length > 48 ? t.slice(0, 46) + '…' : t;
+}
+function newChat() {
+  const ai = aiDb();
+  const cur = curChat();
+  if (!cur.messages.length) return false;
+  const c = { id: 'c' + uid(), t: new Date().toISOString(), messages: [] };
+  ai.chats.push(c); ai.cur = c.id;
+  // keep the newest conversations; very old ones go first
+  while (ai.chats.length > AI_MAX_CHATS) ai.chats.shift();
+  AI.draft = '';
+  return true;
 }
 function aiSet() {
   const s = db.settings;
@@ -60,6 +102,7 @@ window.onAiChunk = (id, json) => {
     const text = parts.filter(p => !p.thought && typeof p.text === 'string').map(p => p.text).join('');
     if (text) h.chunk(text);
     const fr = ((d.candidates || [])[0] || {}).finishReason;
+    if (fr === 'MAX_TOKENS') h.truncated && h.truncated();
     if (fr && fr !== 'STOP' && fr !== 'MAX_TOKENS' && !text) h.blocked && h.blocked(fr);
   } catch (e) { }
 };
@@ -118,10 +161,16 @@ ${aiSet().allowLog ? `
 LOGGING — when the user tells you they ate or drank something and it is not already in the diary for that day, add it with a tag (one tag per meal):
 <log date="YYYY-MM-DD" meal="breakfast|lunch|dinner|snack">items in the user's words, e.g. 2 פרוסות לחם, חביתה</log>
 For water: <water date="YYYY-MM-DD" ml="250"/>
-For a gym workout they did (exercises, sets x reps, kg, minutes), one tag per day: <workout date="YYYY-MM-DD">exercises in the user's words, e.g. סקוואט 4x8 80 קג, ריצה 5 קמ 28:30</workout>
+For a gym workout they did (exercises, sets x reps, kg, minutes): <workout date="YYYY-MM-DD">exercises, e.g. סקוואט 4x8 80 קג, ריצה 5 קמ 28:30</workout>
+- This ADDS exercises to that day. To set or update a day's whole workout (replacing what is there), add mode="replace" (optional title="…"). To delete a day's workout: <workout date="YYYY-MM-DD" mode="delete"/>
+- For several days at once use dates="YYYY-MM-DD,YYYY-MM-DD,…" instead of date, e.g. <workout dates="2026-11-02,2026-11-05" mode="replace">לחיצת חזה 3x10 60 קג, מתח 3x8</workout>
+- "My gym days" / "all my workouts" means the days that already have a workout line in the diary below; list them in dates. If it is unclear which days or which exercises, ask first.
 When they tell you their body weight: <weight date="YYYY-MM-DD" kg="82.4"/>
-If the meal isn't clear, choose by time (before 11:00 breakfast, 11–16 lunch, 16–21 dinner, otherwise snack). Don't log things they only plan or consider eating.` : ''}
+Dates in tags are always YYYY-MM-DD; dates="…" with a comma list works in every tag.
+If the meal isn't clear, choose by time (before 11:00 breakfast, 11–16 lunch, 16–21 dinner, otherwise snack). Don't log things they only plan or consider eating.` : `
+LOGGING from the chat is turned OFF in the app settings, so you cannot change the diary. If the user asks you to log or change something, tell them to turn on "${tr('לרשום ליומן מה שאני מספר בצ׳אט', 'Log what I tell the chat into the diary')}" in ${tr('הגדרות › צ׳אט AI', 'Settings › AI chat')}.`}
 Tags are hidden from the user and handled by the app; mention briefly in words what you saved or logged.
+IMPORTANT: the diary changes ONLY through tags. Never say that you logged, added, updated, changed or deleted something unless the matching tags are in this same reply. If you cannot do something with the tags below, say so honestly.
 
 NUTRITION: the "Nutrition estimate" lines are the app's rough estimates from average food values and usual portions, not measurements; say so when it matters. ${nutSet().goal ? `Daily calorie goal: ${nutSet().goal} kcal (weekly ${weekGoal()}).` : 'No calorie goal set.'} Target split carbs/protein/fat: ${nutSet().target.c}/${nutSet().target.p}/${nutSet().target.f}%. Today so far: ${hasFood(db.days[iso]) ? nutLine(db.days[iso]) : 'nothing logged'}.
 
@@ -146,8 +195,29 @@ function aiContents() {
 }
 
 /* ---------- tags the model writes ---------- */
-const TAG_RE = /<(remember)>([\s\S]*?)<\/remember>|<forget\s+id="([^"]+)"\s*\/?>(?:<\/forget>)?|<log\s+([^>]*)>([\s\S]*?)<\/log>|<water\s+([^>]*?)\/?>(?:<\/water>)?|<workout\b([^>]*)>([\s\S]*?)<\/workout>|<weight\s+([^>]*?)\/?>(?:<\/weight>)?/g;
-function attrs(s) { const o = {}; String(s || '').replace(/(\w+)="([^"]*)"/g, (m, k, v) => { o[k] = v; }); return o; }
+const TAG_RE = /<(remember)>([\s\S]*?)<\/remember>|<forget\s+id="([^"]+)"\s*\/?>(?:<\/forget>)?|<log\s+([^>]*)>([\s\S]*?)<\/log>|<water\s+([^>]*?)\/?>(?:<\/water>)?|<workout\b([^>]*?)(?:\/>|>([\s\S]*?)<\/workout>)|<weight\s+([^>]*?)\/?>(?:<\/weight>)?/g;
+function attrs(s) { const o = {}; String(s || '').replace(/(\w+)\s*=\s*["“”']([^"“”']*)["“”']/g, (m, k, v) => { o[k.toLowerCase()] = v; }); return o; }
+/** "2026-11-03", "3/11/2026", "03.11.26", "3/11" -> ISO date, or null. */
+function tagDate(v) {
+  v = String(v || '').trim();
+  let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+  m = v.match(/^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?$/);
+  if (m) {
+    let y = m[3] ? +m[3] : new Date().getFullYear();
+    if (y < 100) y += 2000;
+    const iso = `${y}-${pad(+m[2])}-${pad(+m[1])}`;
+    if (!m[3] && iso > todayISO()) return `${y - 1}-${pad(+m[2])}-${pad(+m[1])}`;
+    return iso;
+  }
+  return null;
+}
+/** The dates a tag applies to: dates="a,b,c" or date="a"; today when neither is given. */
+function tagDates(a) {
+  const list = String(a.dates || '').split(/[,;\s]+/).map(tagDate).filter(Boolean);
+  if (list.length) return Array.from(new Set(list)).sort();
+  return [tagDate(a.date) || todayISO()];
+}
 function stripTags(text) {
   return text.replace(TAG_RE, '')
     .replace(/<(remember|log|water|forget|workout|weight)\b[^]*$/i, '') // a tag still streaming in
@@ -167,37 +237,49 @@ function applyTags(raw, msg) {
       if (i >= 0) { const f = ai.memory.splice(i, 1)[0]; actions.push({ type: 'forget', text: f.text, fact: f }); }
     } else if (m[4] != null && aiSet().allowLog) {
       const a = attrs(m[4]);
-      const date = /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') ? a.date : todayISO();
       const meal = MEALS.includes(a.meal) ? a.meal : 'snack';
-      const items = P.parseItems(m[5] || '', lex());
-      if (items.length) {
+      for (const date of tagDates(a)) {
+        const items = P.parseItems(m[5] || '', lex());
+        if (!items.length) break;
         const added = addItemsToMeal(date, meal, items, true);
         actions.push({ type: 'log', date, meal, ids: added.map(x => x.id), text: added.map(x => P.formatItem(x)).join(', ') });
       }
     } else if (m[6] != null && aiSet().allowLog) {
       const a = attrs(m[6]);
       const ml = Math.round(+a.ml || 0);
-      const date = /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') ? a.date : todayISO();
-      if (ml > 0 && ml <= 5000) {
+      if (ml > 0 && ml <= 5000) for (const date of tagDates(a)) {
         const d = getDay(date, true); d.drinks = d.drinks || [];
         const t = date === todayISO() ? nowHHMM() : null;
         d.drinks.push({ t, ml }); actions.push({ type: 'water', date, ml, t });
       }
-    } else if (m[8] != null && aiSet().allowLog) {
+    } else if (m[7] != null && aiSet().allowLog) {
       const a = attrs(m[7]);
-      const date = /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') ? a.date : todayISO();
-      const r = window.Gym.parseWorkout(m[8]);
-      if (r.exercises.length) {
+      const mode = /^(replace|set|update)$/i.test(a.mode || '') ? 'replace' : /^(delete|remove|clear)$/i.test(a.mode || '') ? 'delete' : 'add';
+      const r = window.Gym.parseWorkout(m[8] || '');
+      if (mode !== 'delete' && !r.exercises.length) continue;
+      for (const date of tagDates(a)) {
+        const day = getDay(date, mode !== 'delete');
+        if (!day) continue;
+        const prev = day.gym ? clone(day.gym) : null;
+        if (mode === 'delete') {
+          if (!prev) continue;
+          delete day.gym; cleanupDay(date);
+          actions.push({ type: 'workout', mode, date, prev, text: '' });
+          continue;
+        }
+        if (mode === 'replace') day.gym = { title: a.title || (prev && prev.title) || '', minutes: r.minutes || null, note: (prev && prev.note) || '', ex: [] };
         const g = gymOf(date, true);
         const added = addExercises(date, r.exercises);
         if (r.minutes && !g.minutes) g.minutes = r.minutes;
-        actions.push({ type: 'workout', date, ids: added.map(x => x.id), text: added.map(x => window.Gym.exText(x)).join(', ') });
+        if (a.title && !g.title) g.title = a.title;
+        const act = { type: 'workout', mode, date, ids: added.map(x => x.id), text: added.map(x => window.Gym.exText(x)).join(', ') };
+        if (mode === 'replace') act.prev = prev;
+        actions.push(act);
       }
     } else if (m[9] != null && aiSet().allowLog) {
       const a = attrs(m[9]);
-      const date = /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') ? a.date : todayISO();
       const kg = parseFloat(String(a.kg || '').replace(',', '.'));
-      if (kg >= 20 && kg <= 400) { const prev = weightOn(date); setWeight(date, kg); actions.push({ type: 'weight', date, kg, prev }); }
+      if (kg >= 20 && kg <= 400) for (const date of tagDates(a)) { const prev = weightOn(date); setWeight(date, kg); actions.push({ type: 'weight', date, kg, prev }); }
     }
   }
   msg.actions = actions;
@@ -209,7 +291,12 @@ function undoAction(msg, i) {
   if (a.type === 'remember') ai.memory = ai.memory.filter(x => x.id !== a.id);
   else if (a.type === 'forget' && a.fact) ai.memory.push(a.fact);
   else if (a.type === 'log') { const d = getDay(a.date, false); if (d) { d.meals[a.meal] = d.meals[a.meal].filter(x => !a.ids.includes(x.id)); cleanupDay(a.date); } }
-  else if (a.type === 'workout') { const d = getDay(a.date, false); if (d && d.gym) { d.gym.ex = d.gym.ex.filter(x => !a.ids.includes(x.id)); pruneGym(a.date); } }
+  else if (a.type === 'workout') {
+    if (a.mode === 'replace' || a.mode === 'delete') {
+      const d = getDay(a.date, !!a.prev);
+      if (d) { if (a.prev) d.gym = clone(a.prev); else delete d.gym; pruneGym(a.date); }
+    } else { const d = getDay(a.date, false); if (d && d.gym) { d.gym.ex = d.gym.ex.filter(x => !(a.ids || []).includes(x.id)); pruneGym(a.date); } }
+  }
   else if (a.type === 'weight') setWeight(a.date, a.prev || 0);
   else if (a.type === 'water') { const d = getDay(a.date, false); if (d && d.drinks) { const k = d.drinks.findIndex(x => x.ml === a.ml && x.t === a.t); if (k >= 0) d.drinks.splice(k, 1); cleanupDay(a.date); } }
   a.undone = true;
@@ -240,21 +327,47 @@ function actionCard(msg, i) {
   const label = a.type === 'remember' ? [`נשמר בזיכרון: ${a.text}`, `Remembered: ${a.text}`]
     : a.type === 'forget' ? [`נמחק מהזיכרון: ${a.text}`, `Forgot: ${a.text}`]
     : a.type === 'log' ? [`נוסף ל${mealName} (${d}): ${a.text}`, `Added to ${mealName} (${d}): ${a.text}`]
-    : a.type === 'workout' ? [`נוסף לאימון (${d}): ${a.text}`, `Added to workout (${d}): ${a.text}`]
+    : a.type === 'workout' ? (a.mode === 'delete' ? [`נמחק האימון (${d})`, `Deleted the workout (${d})`] : a.mode === 'replace' ? [`עודכן האימון (${d}): ${a.text}`, `Workout updated (${d}): ${a.text}`] : [`נוסף לאימון (${d}): ${a.text}`, `Added to workout (${d}): ${a.text}`])
     : a.type === 'weight' ? [`נרשם משקל (${d}): ${a.kg} ק״ג`, `Weight logged (${d}): ${a.kg} kg`]
     : [`נוספו ${fmtAmount(a.ml)} מים (${d})`, `Added ${fmtAmount(a.ml)} of water (${d})`];
   const ic = { remember: 'brain', forget: 'brain', log: 'book', water: 'drop', workout: 'dumbbell', weight: 'scale' }[a.type];
   return `<div class="aact ${a.undone ? 'undone' : ''}">${icon(ic, 16)}<span class="grow">${a.type === 'workout' ? gymHtml(tr(label[0], label[1])) : esc(tr(label[0], label[1]))}</span>${a.undone ? `<span class="small">${tr('בוטל', 'Undone')}</span>` : `<button class="linkbtn" data-act="aiUndo" data-id="${msg.id}" data-i="${i}">${tr('ביטול', 'Undo')}</button>`}</div>`;
 }
+/** Many days changed the same way in one reply show as one card with one undo. */
+function actionCards(m) {
+  const acts = m.actions || [];
+  let h = '';
+  for (let i = 0; i < acts.length;) {
+    let j = i + 1;
+    const a = acts[i];
+    while (j < acts.length && acts[j].type === a.type && a.type !== 'remember' && a.type !== 'forget' && acts[j].text === a.text && acts[j].mode === a.mode && acts[j].meal === a.meal && acts[j].ml === a.ml && acts[j].kg === a.kg) j++;
+    if (j - i >= 3) { h += groupCard(m, i, j); i = j; } else { for (; i < j; i++) h += actionCard(m, i); }
+  }
+  return h;
+}
+function groupCard(m, from, to) {
+  const acts = m.actions.slice(from, to);
+  const a = acts[0];
+  const n = acts.length;
+  const days = acts.map(x => P.displayDate(x.date).slice(0, 5)).join(', ');
+  const what = a.type === 'workout' ? (a.mode === 'delete' ? tr(`נמחק האימון ב-${n} ימים`, `Deleted the workout on ${n} days`) : a.mode === 'replace' ? tr(`עודכן האימון ב-${n} ימים`, `Updated the workout on ${n} days`) : tr(`נוסף לאימון ב-${n} ימים`, `Added to the workout on ${n} days`))
+    : a.type === 'log' ? tr(`נוסף ל${MEAL[a.meal] ? MEAL[a.meal].label : ''} ב-${n} ימים`, `Added to ${MEAL[a.meal] ? MEAL[a.meal].label : ''} on ${n} days`)
+    : a.type === 'water' ? tr(`נוספו ${fmtAmount(a.ml)} מים ב-${n} ימים`, `Added ${fmtAmount(a.ml)} of water on ${n} days`)
+    : tr(`נרשם משקל ב-${n} ימים`, `Weight logged on ${n} days`);
+  const ic = { log: 'book', water: 'drop', workout: 'dumbbell', weight: 'scale' }[a.type];
+  const undone = acts.every(x => x.undone);
+  return `<div class="aact ${undone ? 'undone' : ''}">${icon(ic, 16)}<span class="grow"><b>${esc(what)}</b>${a.text ? `: ${a.type === 'workout' ? gymHtml(a.text) : esc(a.text)}` : ''}<br><span class="small" dir="ltr">${esc(days)}</span></span>${undone ? `<span class="small">${tr('בוטל', 'Undone')}</span>` : `<button class="linkbtn" data-act="aiUndoGroup" data-id="${m.id}" data-from="${from}" data-to="${to}">${tr('ביטול הכל', 'Undo all')}</button>`}</div>`;
+}
 function bubble(m) {
   const mine = m.role === 'user';
   const body = mine ? `<p>${esc(m.text).replace(/\n/g, '<br>')}</p>` : mdLite(m.text);
-  return `<div class="msg ${mine ? 'me' : 'bot'} ${m.error ? 'err' : ''}" data-mid="${m.id}"><div class="bub">${body || '<span class="typing"><i></i><i></i><i></i></span>'}</div>${(m.actions || []).map((_, i) => actionCard(m, i)).join('')}${m.error ? `<button class="linkbtn" data-act="aiRetry">${icon('undo', 14)} ${tr('נסה שוב', 'Try again')}</button>` : ''}</div>`;
+  const warn = !mine && !m.error && (m.noop || m.cut) ? `<div class="aact warn">${icon('info', 16)}<span class="grow">${m.cut ? tr('התשובה נקטעה באמצע, ויכול להיות שלא הכל נרשם.', 'The answer was cut off, so not everything may have been logged.') : tr('שים לב: בתשובה הזאת לא השתנה שום דבר ביומן.', 'Note: nothing in the diary changed in this answer.')}</span>${AI.busy ? '' : `<button class="linkbtn" data-act="aiRedo" data-cut="${m.cut ? 1 : ''}">${tr('בקש לבצע', 'Ask to do it')}</button>`}</div>` : '';
+  return `<div class="msg ${mine ? 'me' : 'bot'} ${m.error ? 'err' : ''}" data-mid="${m.id}"><div class="bub">${body || '<span class="typing"><i></i><i></i><i></i></span>'}</div>${actionCards(m)}${warn}${m.error ? `<button class="linkbtn" data-act="aiRetry">${icon('undo', 14)} ${tr('נסה שוב', 'Try again')}</button>` : ''}</div>`;
 }
 function viewChat() {
   const s = aiSet();
   let h = `<section class="topbar chat-top"><h1>${icon('sparkle', 22)} ${tr('העוזר שלי', 'My assistant')}</h1>
-    ${s.key ? `<div class="row" style="gap:6px"><button class="iconbtn" data-act="aiMemory" aria-label="${tr('מה אני זוכר', 'What I remember')}">${icon('brain')}</button><button class="iconbtn" data-act="aiClear" aria-label="${tr('שיחה חדשה', 'New chat')}">${icon('trash')}</button></div>` : ''}</section>`;
+    ${s.key ? `<div class="row" style="gap:6px"><button class="iconbtn" data-act="aiMemory" aria-label="${tr('מה אני זוכר', 'What I remember')}">${icon('brain')}</button><button class="iconbtn" data-act="aiChats" aria-label="${tr('שיחות קודמות', 'Previous chats')}">${icon('history')}</button><button class="iconbtn primary" data-act="aiNew" aria-label="${tr('שיחה חדשה', 'New chat')}">${icon('newpage')}</button></div>` : ''}</section>`;
   if (!s.key) return h + aiSetupHtml();
   const msgs = aiDb().messages;
   if (!msgs.length) {
@@ -320,15 +433,20 @@ function aiRun() {
   const body = {
     systemInstruction: { parts: [{ text: aiSystemPrompt() }] },
     contents: aiContents().filter(c => c.parts[0].text),
-    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+    generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
   };
   const go = (model) => aiStream(model, body, {
     chunk(t) { bot.raw += t; bot.text = stripTags(bot.raw); updateStreamingBubble(bot); },
     blocked() { bot.raw = bot.raw || tr('לא יכולתי לענות על זה.', "I couldn't answer that."); },
+    truncated() { bot.cut = true; },
     done() {
       AI.busy = false;
       if (!bot.raw.trim()) { bot.error = true; bot.text = tr('לא התקבלה תשובה. נסה שוב.', 'No answer came back. Try again.'); }
-      else { applyTags(bot.raw, bot); bot.text = stripTags(bot.raw); }
+      else {
+        applyTags(bot.raw, bot); bot.text = stripTags(bot.raw);
+        // the reply says it changed the diary, but no change came with it
+        if (!bot.actions.length && s.allowLog && /(רשמתי|עדכנתי|הוספתי|שיניתי|מחקתי|תיקנתי|החלפתי|\bI(?:'ve| have)? (?:logged|updated|added|changed|deleted|replaced)\b)/i.test(bot.text)) bot.noop = true;
+      }
       save(); if (S.tab === 'chat') { render({ keepScroll: true }); chatScrollBottom(true); }
     },
     error(code, detail) {
@@ -342,6 +460,24 @@ function aiRun() {
     },
   });
   go(s.model || 'gemini-flash-latest');
+}
+
+/* ---------- conversations sheet ---------- */
+function chatsHtml() {
+  const ai = aiDb();
+  const cur = curChat();
+  const list = ai.chats.filter(c => c.messages.length || c.id === cur.id).slice().reverse();
+  return sheetHead(tr('שיחות', 'Chats')) + `<div class="body">
+    <button class="btn primary block" data-act="aiNewFromList">${icon('newpage', 18)}${tr('שיחה חדשה', 'New chat')}</button>
+    <p class="small muted" style="margin:0">${tr('כל שיחה מתחילה מאפס, אבל העוזר תמיד מכיר את היומן ואת מה שביקשת שיזכור.', 'Each chat starts fresh, but the assistant always knows your diary and what you asked it to remember.')}</p>
+    <div class="list">${list.map(c => {
+      const n = c.messages.filter(m => m.role === 'user').length;
+      const last = c.messages.length ? c.messages[c.messages.length - 1].t : c.t;
+      const d = last ? isoOf(new Date(last)) : '';
+      return `<div class="li${c.id === cur.id ? ' cur' : ''}"><button class="grow" style="border:none;background:none;text-align:start;padding:0;min-height:48px;color:inherit;font:inherit" data-act="aiOpenChat" data-id="${c.id}"><span class="t">${esc(chatTitle(c))}</span><br><span class="s">${d ? P.displayDate(d) : ''}${n ? ` · ${n} ${plural(n, 'הודעה', 'הודעות', 'message', 'messages')}` : ''}${c.id === cur.id ? ` · ${tr('פתוחה עכשיו', 'open now')}` : ''}</span></button>
+        ${c.messages.length ? `<button class="iconbtn plain" data-act="aiDelChat" data-id="${c.id}" aria-label="${tr('מחיקת השיחה', 'Delete chat')}">${icon('trash', 18)}</button>` : ''}</div>`;
+    }).join('')}</div>
+  </div>`;
 }
 
 /* ---------- memory sheet ---------- */
@@ -407,8 +543,41 @@ const AI_ACT = {
     const m = aiDb().messages.find(x => x.id === el.dataset.id);
     if (m) { undoAction(m, +el.dataset.i); render({ keepScroll: true }); }
   },
-  aiClear() {
-    confirmSheet(tr('שיחה חדשה', 'New chat'), tr('ההודעות יימחקו. מה שהעוזר זוכר עליך יישאר (אפשר לראות בכפתור הזיכרון).', 'Messages will be deleted. What the assistant remembers about you stays (see the memory button).'), tr('מחק הודעות', 'Delete messages'), () => { aiDb().messages = []; save(); render(); });
+  aiNew() {
+    if (AI.busy) AI_ACT.aiStop();
+    const made = newChat();
+    save(); render();
+    if (made) toast(tr('דף חדש. השיחה הקודמת שמורה בכפתור השיחות', 'New page. Your previous chat is saved under the chats button'));
+    setTimeout(() => { const t = $('[data-on="chatText"]'); if (t) t.focus(); }, 80);
+  },
+  aiChats() { openSheet('chats', chatsHtml(), { title: tr('שיחות', 'Chats') }); },
+  aiNewFromList() { closeSheet(); AI_ACT.aiNew(); },
+  aiOpenChat(el) {
+    if (AI.busy) AI_ACT.aiStop();
+    const ai = aiDb();
+    // an empty page is dropped when you leave it
+    const cur = curChat();
+    if (!cur.messages.length && cur.id !== el.dataset.id) ai.chats = ai.chats.filter(c => c.id !== cur.id);
+    ai.cur = el.dataset.id; AI.draft = '';
+    save(); closeSheet(); render(); chatScrollBottom(true);
+  },
+  aiDelChat(el) {
+    const ai = aiDb();
+    const i = ai.chats.findIndex(c => c.id === el.dataset.id); if (i < 0) return;
+    const [c] = ai.chats.splice(i, 1);
+    const wasCur = ai.cur === c.id;
+    if (wasCur) ai.cur = null;
+    save(); replaceSheetBody('chats', chatsHtml()); render();
+    toast(tr('השיחה נמחקה', 'Chat deleted'), { label: tr('ביטול', 'Undo'), fn: () => { ai.chats.splice(i, 0, c); if (wasCur) ai.cur = c.id; save(); if (sheetStack.find(x => x.id === 'chats')) replaceSheetBody('chats', chatsHtml()); render(); } });
+  },
+  aiRedo(el) {
+    aiSend(el.dataset.cut ? tr('התשובה נקטעה. תמשיך בבקשה ותבצע את מה שנשאר, בקצרה.', 'Your answer was cut off. Please continue and do what is left, briefly.') : tr('לא ראיתי שינוי ביומן. תבצע את זה בפועל בבקשה.', "I don't see any change in the diary. Please actually do it."));
+  },
+  aiUndoGroup(el) {
+    const m = aiDb().messages.find(x => x.id === el.dataset.id); if (!m) return;
+    // newest first, so a day changed twice goes back to how it was
+    for (let i = +el.dataset.to - 1; i >= +el.dataset.from; i--) undoAction(m, i);
+    render({ keepScroll: true });
   },
   aiMemory() { openSheet('memory', memoryHtml(), { title: tr('זיכרון', 'Memory'), onClose: () => render({ keepScroll: true }) }); },
   memDel(el) { const ai = aiDb(); ai.memory = ai.memory.filter(x => x.id !== el.dataset.id); save(); replaceSheetBody('memory', memoryHtml()); },
