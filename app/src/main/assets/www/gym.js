@@ -91,6 +91,11 @@
       const r = m[1].split(/[\/\-]/).map(num), w = m[2].split(/[\/\-]/).map(num);
       list = r.map((x, i) => ({ reps: x, kg: w[Math.min(i, w.length - 1)] }));
     });
+    // a clock time: "28:30", "ב-28:30", "1:05:20"
+    take(/(?:^|\s)(?:ב-?|in\s)?(\d{1,3}):([0-5]\d)(?::([0-5]\d))?(?=\s|$)/i, m => {
+      minutes = m[3] != null ? +m[1] * 60 + +m[2] + +m[3] / 60 : +m[1] + +m[2] / 60;
+      minutes = Math.round(minutes * 1000) / 1000;
+    });
     // 3x60 שניות / 3x2 דקות: timed sets (plank, intervals)
     take(new RegExp(`(\\d+)\\s*x\\s*(\\d+(?:[.,]\\d+)?)\\s*(${R.sec}|${R.min})(?![\\w\\u05d0-\\u05ea])`, 'i'), m => {
       const tot = +m[1] * num(m[2]);
@@ -99,8 +104,8 @@
     take(new RegExp(`(\\d+)\\s*x\\s*(\\d+)(?:\\s*x\\s*(\\d+(?:[.,]\\d+)?)\\s*${R.kg}?)?`, 'i'), m => { sets = +m[1]; reps = +m[2]; if (m[3]) kg = num(m[3]); });
     take(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*${R.kg}(?![\\w\\u05d0-\\u05ea])`, 'i'), m => { kg = num(m[1]); });
     take(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*${R.km}(?![\\w\\u05d0-\\u05ea])`, 'i'), m => { km = num(m[1]); });
-    take(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*${R.min}(?![\\w\\u05d0-\\u05ea])`, 'i'), m => { minutes = num(m[1]); });
-    take(new RegExp(`(\\d+)\\s*${R.sec}(?![\\w\\u05d0-\\u05ea])`, 'i'), m => { secs = +m[1]; });
+    take(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*${R.min}(?![\\w\\u05d0-\\u05ea])`, 'i'), m => { if (minutes == null) minutes = num(m[1]); });
+    take(new RegExp(`(?:ו-?\\s*)?(\\d+)\\s*${R.sec}(?![\\w\\u05d0-\\u05ea])`, 'i'), m => { secs = +m[1]; });
     take(new RegExp(`(\\d+)\\s*${R.sets}(?:\\s+(?:של|of))?`, 'i'), m => { sets = +m[1]; });
     take(new RegExp(`(\\d+)\\s*${R.reps}`, 'i'), m => { reps = +m[1]; });
     take(/(?:^|\s)(?:ב-?|at\s)\s*(\d+(?:[.,]\d+)?)(?=\s|$)/i, m => { if (kg == null) kg = num(m[1]); }); // "ב-60", "at 60"
@@ -112,7 +117,7 @@
     name = canonical(name);
     const kind = kindOf(name);
     if (kind === 'c') {
-      if (minutes == null && secs != null) minutes = Math.round(secs / 60 * 100) / 100;
+      if (secs != null) minutes = Math.round(((minutes || 0) + secs / 60) * 1000) / 1000;
       if (minutes == null && lone != null) minutes = lone;
       return { name, kind, minutes, km };
     }
@@ -181,12 +186,30 @@
     const anyKg = runs.some(r => r.kg != null);
     return runs.map(r => `${r.n}×${r.reps != null ? fmtN(r.reps) : '?'}` + (r.kg != null ? ` · ${fmtN(r.kg)}` : '')).join(', ') + (anyKg ? ` ${kgU}` : '');
   }
+  /** 28.5 -> "28:30", 65.25 -> "1:05:15" */
+  function clock(min) {
+    let t = Math.round(min * 60);
+    const h = Math.floor(t / 3600); t -= h * 3600;
+    const m = Math.floor(t / 60), sec = t - m * 60;
+    const p2 = (n) => String(n).padStart(2, '0');
+    return h ? `${h}:${p2(m)}:${p2(sec)}` : `${m}:${p2(sec)}`;
+  }
+  function hasSeconds(min) { return Math.abs(min * 60 - Math.round(min) * 60) >= 1; }
+  /** Minutes per km, or null. */
+  function paceOf(e) { return e && e.kind === 'c' && e.km > 0 && e.minutes > 0 ? e.minutes / e.km : null; }
+  function durText(e) {
+    if (e.minutes == null) return '';
+    if (e.minutes < 3 && e.km == null) return `${Math.round(e.minutes * 60)} ${T('שנ׳', 'sec')}`;
+    if (e.minutes >= 60 || hasSeconds(e.minutes)) return clock(e.minutes);
+    return `${fmtN(e.minutes)} ${T('דק׳', 'min')}`;
+  }
   function exDetail(e) {
     let d = '';
     if (e.kind === 'c') {
       const p = [];
-      if (e.minutes != null) p.push(e.minutes < 3 && e.km == null ? `${Math.round(e.minutes * 60)} ${T('שנ׳', 'sec')}` : `${fmtN(e.minutes)} ${T('דק׳', 'min')}`);
       if (e.km != null) p.push(`${fmtN(e.km)} ${T('ק״מ', 'km')}`);
+      const dt = durText(e); if (dt) p.push(dt);
+      const pc = paceOf(e); if (pc) p.push(T(`${clock(pc)} לק״מ`, `${clock(pc)}/km`));
       d = p.join(' · ');
     } else d = setsText(e.sets);
     return d;
@@ -202,7 +225,7 @@
     if (!g) return '';
     const parts = (g.ex || []).map(e => {
       const nm = displayName(e.name);
-      if (e.kind === 'c') return [nm, e.minutes != null ? (e.minutes < 3 && e.km == null ? `${Math.round(e.minutes * 60)} ${T('שניות', 'sec')}` : `${fmtN(e.minutes)} ${T('דקות', 'min')}`) : '', e.km != null ? `${fmtN(e.km)} ${T('ק״מ', 'km')}` : ''].filter(Boolean).join(' ');
+      if (e.kind === 'c') return [nm, e.km != null ? `${fmtN(e.km)} ${T('ק״מ', 'km')}` : '', e.minutes != null ? (e.minutes < 3 && e.km == null ? `${Math.round(e.minutes * 60)} ${T('שניות', 'sec')}` : e.minutes >= 60 || hasSeconds(e.minutes) ? clock(e.minutes) : `${fmtN(e.minutes)} ${T('דקות', 'min')}`) : ''].filter(Boolean).join(' ');
       const sets = e.sets || [];
       const same = sets.length && sets.every(x => x.reps === sets[0].reps && x.kg === sets[0].kg);
       if (!sets.length) return nm;
@@ -214,7 +237,7 @@
     return parts.join(', ');
   }
 
-  const api = { EX, ALIAS, GROUPS, setLang, canonical, info, kindOf, displayName, groupOf, parseExercise, parseWorkout, splitSegments, setsText, exDetail, exText, workoutText, norm };
+  const api = { EX, ALIAS, GROUPS, setLang, canonical, info, kindOf, displayName, groupOf, parseExercise, parseWorkout, splitSegments, setsText, exDetail, exText, workoutText, norm, clock, paceOf };
   if (typeof module !== 'undefined') module.exports = api;
   else root.Gym = api;
 })(typeof window !== 'undefined' ? window : globalThis);

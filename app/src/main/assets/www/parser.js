@@ -210,6 +210,8 @@
   const WATER_RE = /^(?:מים|water)\s*[:\-–]\s*(\d+(?:[.,]\d+)?)\s*([^\s\d]*)/i;
   const NOTES_RE = /^(?:הערות|notes?)\s*[:\-–]\s*(.*)$/i;
   // "אימון: …", "אימון (חזה וכתפיים): …", "אימון רגליים: …", "Workout: …" — gym lines, read by gym.js
+  // "משקל: 82.4", "שקילה 82.4 ק״ג", "Weight: 82.4kg"
+  const WEIGHT_RE = /^(?:משקל|שקילה|נשקלתי|weight|weigh-in)\s*[:\-–]?\s*(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:ק"ג|ק״ג|קג|קילו|kg)?\.?$/i;
   const GYM_HEAD = /^(?:אימון|אימונים|כושר|חדר כושר|ספורט|workout|gym|training|exercise)(?=$|[\s:：\-–(])/i;
   const DATE_RE = /^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?(?!\d)(.*)$/;
 
@@ -264,6 +266,15 @@
       if (wm && day) { day.waterRaw = { n: parseFloat(wm[1].replace(',', '.')), unit: (wm[2] || '').replace(/[.,;]+$/, '') }; continue; }
       const nm = line.match(NOTES_RE);
       if (nm && day) { day.note = day.note ? day.note + '\n' + nm[1] : nm[1]; continue; }
+      const wtm = line.match(WEIGHT_RE);
+      if (wtm) {
+        if (!day) {
+          if (opts.defaultDate) newDay(opts.defaultDate);
+          else { warnings.push({ line, msg: 'meal_no_date' }); continue; }
+        }
+        day.weightKg = parseFloat(wtm[1].replace(',', '.'));
+        continue;
+      }
       const gh = line.match(GYM_HEAD);
       if (gh) {
         if (!day) {
@@ -427,6 +438,7 @@
       const l = Math.round(day.waterMl / 10) / 100;
       out.push(en ? `• Water: ${l} L` : `• מים: ${l} ליטר`);
     } else if (day.water) out.push(en ? `• Water: ${day.water} glasses` : `• מים: ${day.water} כוסות`);
+    if (day.weightKg) out.push(en ? `• Weight: ${day.weightKg} kg` : `• משקל: ${day.weightKg} ק״ג`);
     if (day.gymText || day.gymTitle) {
       const t = day.gymTitle ? ` (${day.gymTitle})` : '';
       out.push((en ? `• Workout${t}: ` : `• אימון${t}: `) + (day.gymText || ''));

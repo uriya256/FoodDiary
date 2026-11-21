@@ -84,6 +84,7 @@ const IC = {
   star: '<path class="d" d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9z"/><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8-4.3-4.1 5.9-.9z"/>',
   camera: '<path class="d" d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
   globe: '<circle class="d" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/>',
+  scale: '<rect class="d" x="3.5" y="3.5" width="17" height="17" rx="4.5"/><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 10.5a4.6 4.6 0 0 1 8 0"/><path d="M12 10.8l1.6-2.6"/>',
   dumbbell: '<rect class="d" x="4.5" y="6.5" width="3.2" height="11" rx="1.3"/><rect class="d" x="16.3" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="4.5" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="16.3" y="6.5" width="3.2" height="11" rx="1.3"/><path d="M2.5 9.5v5M21.5 9.5v5M7.7 12h8.6"/>',
   timer: '<circle class="d" cx="12" cy="13.5" r="7.5"/><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M12 2.5v3.5M18.6 6.9l1.5-1.5"/>',
   trophy: '<path class="d" d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5A2.5 2.5 0 0 0 7 10.5M17 6h2.5A2.5 2.5 0 0 1 17 10.5M12 14v3.5M8.5 20.5h7M9.5 17.5h5v3h-5z"/>',
@@ -123,7 +124,7 @@ function lev(a, b) {
 /* ---------------- data ---------------- */
 function freshDb() {
   return {
-    v: 1, days: {}, foods: {}, aliases: {}, templates: [], routines: [],
+    v: 1, days: {}, foods: {}, aliases: {}, templates: [], routines: [], nut: {}, weights: [],
     settings: {
       theme: 'auto', accent: '#2F7D4F', bg: 'sage', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false, motion: true,
       showWater: true, water: WATER_DEFAULTS(), reminder: { on: false, h: 21, m: 0 },
@@ -161,6 +162,8 @@ function hydrateDb(d) {
   out.templates = out.templates || [];
   out.routines = Array.isArray(out.routines) ? out.routines.filter(r => r && r.name && Array.isArray(r.ex)) : [];
   out.settings.gym = Object.assign({ rest: 90 }, ds.gym || {});
+  out.nut = out.nut && typeof out.nut === 'object' ? out.nut : {};
+  out.weights = Array.isArray(out.weights) ? out.weights.filter(x => x && x.date && x.kg > 0) : [];
   const prev = db;
   db = out;
   try { migrateWater(); } finally { db = prev; }
@@ -197,7 +200,7 @@ function getDay(iso, create) {
 }
 function dayHasData(d) { return d && (MEALS.some(m => d.meals[m] && d.meals[m].length) || (d.drinks && d.drinks.length) || d.note || !!dayGym(d)); }
 /** A day as text, in the same format the user writes (water as litres). */
-function dayText(iso, d) { d = d || db.days[iso]; return P.dayToText(iso, Object.assign({}, d, { waterMl: drinksMl(d), gymText: gymText(d), gymTitle: gymTitleOf(d) })); }
+function dayText(iso, d) { d = d || db.days[iso] || { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, mealNotes: {}, drinks: [], note: '' }; return P.dayToText(iso, Object.assign({}, d, { waterMl: drinksMl(d), gymText: gymText(d), gymTitle: gymTitleOf(d), weightKg: weightOn(iso) })); }
 function mealsCount(d) { return d ? MEALS.filter(m => d.meals[m] && d.meals[m].length).length : 0; }
 function cleanupDay(iso) { const d = db.days[iso]; if (d && !dayHasData(d) && !Object.values(d.mealNotes || {}).some(Boolean)) delete db.days[iso]; }
 
@@ -221,7 +224,7 @@ function catOf(name) { const L = lex(); return L.cats[name] || (db.foods[name] &
 function canonical(name) { return lex().aliases[nk(name)] || name.trim(); }
 
 let USAGE = null;
-function invalidate() { USAGE = null; LEX = null; }
+function invalidate() { USAGE = null; LEX = null; if (typeof nutInvalidate === 'function') nutInvalidate(); }
 function usage() {
   if (USAGE) return USAGE;
   const u = {};
@@ -475,6 +478,7 @@ function viewToday() {
     <button class="btn" data-act="openImport" data-mode="day"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span>${tr('פתק או טקסט', 'Note or text')}</button>
     <button class="btn" data-act="shareDay"><span class="qi" style="--q1:#5EE0B2;--q2:#1E9C7A">${icon('share', 20)}</span>${tr('שתף את היום', 'Share day')}</button>
   </div>`;
+  if (nutOn()) h += nutDayCardHtml(iso);
 
   for (const m of MEALS) {
     const items = day ? day.meals[m] : [];
@@ -483,12 +487,12 @@ function viewToday() {
     h += `<section class="card" aria-label="${MEAL[m].label}">
       <div class="meal-head">
         <span class="meal-icon" style="background:${MEAL[m].grad};--glow:${MEAL[m].tint}">${icon(MEAL[m].icon, 24)}</span>
-        <div class="meal-title"><h2>${MEAL[m].label}</h2>${items.length ? `<div class="sub">${items.length} ${plural(items.length, 'פריט', 'פריטים', 'item', 'items')}</div>` : ''}</div>
+        <div class="meal-title"><h2>${MEAL[m].label}</h2>${items.length ? `<div class="sub">${items.length} ${plural(items.length, 'פריט', 'פריטים', 'item', 'items')}${nutOn() ? ` · ≈ ${kc(mealN(items).k)} ${tr('קק״ל', 'kcal')}` : ''}</div>` : ''}</div>
         <button class="iconbtn flat" data-act="mealMenu" data-meal="${m}" aria-label="${tr(`אפשרויות ל${MEAL[m].label}`, `${MEAL[m].label} options`)}">${icon('dots')}</button>
         <button class="iconbtn primary" data-act="openAdd" data-meal="${m}" aria-label="${tr(`הוספה ל${MEAL[m].label}`, `Add to ${MEAL[m].label}`)}">${icon('plus')}</button>
       </div>`;
     if (items.length) {
-      h += `<div class="chips">${items.map((it, i) => itemChip(it, m, i)).join('')}</div>`;
+      h += `<div class="chips">${items.map((it, i) => itemChip(it, m, i)).join('')}</div>${mealNutHtml(items)}`;
     } else {
       h += `<div class="chips">${tpls.slice(0, 3).map(t => `<button class="chip tpl" data-act="applyTpl" data-id="${t.id}" data-meal="${m}">${icon('bookmark', 16)}${esc(t.name)}</button>`).join('')}<button class="chip ghost" data-act="openAdd" data-meal="${m}">${icon('plus', 16)}${tr('מה אכלת?', 'What did you eat?')}</button></div>`;
     }
@@ -498,6 +502,7 @@ function viewToday() {
 
   if (db.settings.showWater) h += waterCardHtml(iso);
   if (db.settings.showGym !== false || dayGym(day)) h += workoutCardHtml(iso);
+  if (wtSet().show !== false) h += weightCardHtml();
   h += `<section class="card"><h3 class="row">${icon('note', 18)}${tr('הערות על היום', 'Notes for the day')}</h3>
     <textarea class="note" rows="2" data-on="dayNote" placeholder="${tr('איך הרגשת, אכלת בחוץ, משהו מיוחד…', 'How you felt, ate out, anything special…')}">${esc((day && day.note) || '')}</textarea></section>`;
   return h;
@@ -552,6 +557,9 @@ function viewHistory() {
     const wml = dayWaterMl(d);
     if (wml) lines.push(`<span><b>${tr('מים', 'Water')}:</b> ${fmtAmount(wml)}${wml >= W().goalMl ? ' ✓' : ''}</span>`);
     if (dayGym(d)) lines.push(`<span><b>${tr('אימון', 'Workout')}:</b> ${hl(gymHistoryLine(d))}</span>`);
+    const wk = weightOn(iso);
+    if (wk) lines.push(`<span><b>${tr('משקל', 'Weight')}:</b> ${fmtKg(wk)} ${tr('ק״ג', 'kg')}</span>`);
+    if (nutOn() && hasFood(d)) { const t = dayN(d), pc = Nutri.macroPct(t); lines.push(`<span class="muted"><b>${tr('תזונה', 'Nutrition')}:</b> ≈ ${kc(t.k)} ${tr('קק״ל', 'kcal')}${pc ? ` · ${pc.c}/${pc.p}/${pc.f}%` : ''}</span>`); }
     h += `<button class="card dayitem" data-act="openDay" data-date="${iso}">
       <div class="row between"><span style="font-weight:700">${tr('יום ', '')}${P.weekdayName(iso)}, ${shortDate(iso)}</span><span class="small muted">${P.displayDate(iso)}</span></div>
       <div class="lines">${lines.join('')}</div></button>`;
@@ -621,6 +629,8 @@ function viewStats() {
     h += `<div class="barrow"><div class="row between"><span>${esc(n)}</span><span class="muted small">${counts[n]} ${plural(counts[n], 'פעם', 'פעמים', 'time', 'times')}</span></div><div class="bar"><i style="width:${Math.round(counts[n] / maxC * 100)}%"></i></div></div>`;
   }
   h += `</div></section>
+  ${nutStatsHtml(dates)}
+  ${weightStatsHtml()}
   ${gymStatsHtml(dates)}
   <div class="row" style="gap:8px">
     <button class="btn grow" data-act="sharePeriod">${icon('share', 18)}${tr('שתף כטקסט', 'Share as text')}</button>
@@ -687,6 +697,8 @@ function viewSettings() {
     ${A ? '' : `<div class="small muted">${tr('תזכורות עובדות באפליקציה המותקנת בטלפון.', 'Reminders work in the app installed on your phone.')}</div>`}
   </section>
   ${aiSettingsHtml()}
+  ${nutSettingsHtml()}
+  ${weightSettingsHtml()}
   ${waterSettingsHtml()}
   ${gymSettingsHtml()}
   <section class="card">
@@ -829,12 +841,23 @@ function editHtml() {
     <label class="field"><span>${tr('עם (מופרד בפסיקים)', 'With (comma separated)')}</span><input type="text" value="${esc((it.with || []).join(', '))}" data-on="eWith" placeholder="${tr('למשל: גזר, מלפפון', 'e.g. carrot, cucumber')}"></label>
     <label class="field"><span>${tr('הערה', 'Note')}</span><input type="text" value="${esc(it.note || '')}" data-on="eNote" placeholder="${tr('למשל: ללא סוכר', 'e.g. no sugar')}"></label>
     <div class="field"><span>${tr('ארוחה', 'Meal')}</span><div class="seg">${seg}</div></div>
+    ${nutOn() ? `<div id="eNut">${editNutHtml()}</div>` : ''}
   </div>
   <footer>
     <button class="btn danger" data-act="eDelete">${icon('trash', 18)}${tr('מחק', 'Delete')}</button>
     <button class="btn" data-act="eDup">${icon('copy', 18)}${tr('שכפל', 'Duplicate')}</button>
     <button class="btn primary grow" data-act="eSave">${tr('שמירה', 'Save')}</button>
   </footer>`;
+}
+
+function refreshEditNut() { const b = $('#eNut'); if (b) b.innerHTML = editNutHtml(); }
+function editNutHtml() {
+  const it = EDIT.it;
+  if (!it || !it.name) return '';
+  const x = itemN(it);
+  const r = resolveFood(it.name);
+  return `<div class="enut"><span class="grow">${x.unknown ? tr('אין ערכים תזונתיים למאכל הזה', 'No nutrition values for this food') : `≈ <b>${kc(x.k)}</b> ${tr('קק״ל', 'kcal')} · ${tr('חלבון', 'Protein')} ${gr(x.p)} · ${tr('פחמימות', 'Carbs')} ${gr(x.c)} · ${tr('שומן', 'Fat')} ${gr(x.f)} ${tr('ג׳', 'g')}${x.guess ? ` <span class="bal near">${tr('הערכה גסה', 'Rough guess')}</span>` : ''}`}</span>
+    <button class="btn" data-act="openNutEdit" data-name="${esc(r ? r.name : it.name)}">${icon('edit', 16)}${tr('ערכים', 'Values')}</button></div>`;
 }
 
 /* ----- meal menu ----- */
@@ -936,7 +959,7 @@ function importHtml() {
     const pd = applyMerges(d);
     const gr = d.gymRaw ? window.Gym.parseWorkout(d.gymRaw) : null;
     const gt = gr ? window.Gym.workoutText({ minutes: gr.minutes, note: gr.note, ex: gr.exercises }) : '';
-    h += `<div class="importday">${esc(P.dayToText(d.date, Object.assign(pd, { waterMl: waterRawToMl(d.waterRaw), gymText: gt, gymTitle: d.gymTitle || '' })))}</div>`;
+    h += `<div class="importday">${esc(P.dayToText(d.date, Object.assign(pd, { waterMl: waterRawToMl(d.waterRaw), gymText: gt, gymTitle: d.gymTitle || '', weightKg: d.weightKg || null })))}</div>`;
   });
   if (r.days.length > IMP.showDays) h += `<button class="btn" data-act="impMore">${tr(`הצג עוד ${Math.min(20, r.days.length - IMP.showDays)} ימים`, `Show ${Math.min(20, r.days.length - IMP.showDays)} more days`)}</button>`;
   h += `</div><footer><button class="btn" data-act="impBack">${tr('עריכה', 'Edit')}</button><button class="btn primary big grow" data-act="impGo" ${r.days.length ? '' : 'disabled'}>${icon('check', 20)}${tr('ייבוא', 'Import')}</button></footer>`;
@@ -1004,6 +1027,7 @@ function doImport() {
     const wml = waterRawToMl(d.waterRaw);
     if (wml && (!drinksMl(day) || IMP.conflict === 'replace')) day.drinks = [{ t: null, ml: Math.round(wml) }];
     if ((d.gymRaw || d.gymTitle) && importGym(day, d.gymRaw, d.gymTitle, exists && IMP.conflict === 'replace' && IMP.mode !== 'day')) nGym++;
+    if (d.weightKg && (weightOn(d.date) == null || IMP.conflict === 'replace')) setWeight(d.date, d.weightKg);
     nDays++;
   }
   save();
@@ -1028,7 +1052,8 @@ function foodsHtml() {
     <div class="searchbox">${icon('search', 18)}<input class="search" type="search" data-on="foodsQ" value="${esc(FOODS.q)}" placeholder="${tr('חיפוש', 'Search')}" aria-label="${tr('חיפוש מאכל', 'Search food')}"></div>
     <p class="small muted" style="margin:0">${tr('לחיצה על שם מאפשרת לשנות אותו או לאחד אותו עם מאכל אחר. כל ההיסטוריה מתעדכנת.', 'Tap a name to rename it or merge it into another food. All your history updates.')}</p>
     <div class="list" id="foodsList">${names.length ? names.map(n => `<div class="li">
-      <button class="grow" style="border:none;background:none;text-align:start;padding:0;min-height:44px" data-act="renameFood" data-name="${esc(n)}"><span class="t">${esc(n)}</span><br><span class="s">${u[n].n} ${plural(u[n].n, 'פעם', 'פעמים', 'time', 'times')}</span></button>
+      <button class="grow" style="border:none;background:none;text-align:start;padding:0;min-height:44px" data-act="renameFood" data-name="${esc(n)}"><span class="t">${esc(n)}</span><br><span class="s">${u[n].n} ${plural(u[n].n, 'פעם', 'פעמים', 'time', 'times')}${nutOn() ? (() => { const r = resolveFood(n); const v = r && Nutri.nutFor(r.name, r.cat, db.nut || {}); return v ? ` · ≈ ${kc(v.k * v.serving / 100)} ${tr('קק״ל למנה', 'kcal a serving')}${v.src === 'user' ? ' ✎' : v.src === 'cat' ? ' ?' : ''}` : ` · ${tr('בלי ערכים', 'no values')}`; })() : ''}</span></button>
+      ${nutOn() ? `<button class="iconbtn plain" data-act="openNutEdit" data-name="${esc(n)}" aria-label="${tr('ערכים תזונתיים של', 'Nutrition values of')} ${esc(n)}">${icon('flame', 18)}</button>` : ''}
       <select data-on="foodCat" data-name="${esc(n)}" aria-label="${tr('קטגוריה של', 'Category of')} ${esc(n)}" style="max-width:150px;border:1px solid var(--line);border-radius:12px;padding:8px;background:transparent;min-height:44px">${catOpts(catOf(n))}</select>
     </div>`).join('') : `<div class="muted small" style="padding:12px 0">${tr('אין מאכלים עדיין.', 'No foods yet.')}</div>`}</div>
   </div>`;
@@ -1045,6 +1070,7 @@ function renameFood(from, to) {
   }
   db.templates.forEach(t => t.items.forEach(it => { if (it.name === from) it.name = to; }));
   if (db.foods[from]) { if (!db.foods[to]) db.foods[to] = db.foods[from]; delete db.foods[from]; }
+  if (db.nut && db.nut[from]) { if (!db.nut[to]) db.nut[to] = db.nut[from]; delete db.nut[from]; }
   if (!BASE.dict[to] && !db.foods[to]) db.foods[to] = { cat: catOf(from) };
   db.aliases[nk(from)] = to;
   for (const k in db.aliases) if (db.aliases[k] === from) db.aliases[k] = to;
@@ -1103,6 +1129,10 @@ function mergeInto(cur, bak) {
     Object.keys(b.mealNotes || {}).forEach(m => { if (!c.mealNotes[m]) c.mealNotes[m] = b.mealNotes[m]; });
     mergeGym(c, b);
   }
+  cur.nut = cur.nut || {};
+  Object.keys(bak.nut || {}).forEach(k => { if (!cur.nut[k]) cur.nut[k] = bak.nut[k]; });
+  cur.weights = cur.weights || [];
+  (bak.weights || []).forEach(x => { if (x && x.date && !cur.weights.some(y => y.date === x.date)) cur.weights.push(x); });
   const rids = new Set((cur.routines = cur.routines || []).map(r => r.name));
   (bak.routines || []).forEach(r => { if (!rids.has(r.name)) cur.routines.push(r); });
   cur.foods = Object.assign({}, bak.foods || {}, cur.foods);
@@ -1139,10 +1169,13 @@ function shareText(text) {
   navigator.clipboard && navigator.clipboard.writeText(text).then(() => toast(tr('הועתק', 'Copied')));
 }
 function csvOf(dates) {
-  const rows = [LANG === 'en' ? ['Date', 'Day', 'Meal', 'Food', 'Amount', 'Unit', 'With', 'Note', 'Category'] : ['תאריך', 'יום', 'ארוחה', 'מאכל', 'כמות', 'יחידה', 'עם', 'הערה', 'קטגוריה']];
+  const rows = [LANG === 'en' ? ['Date', 'Day', 'Meal', 'Food', 'Amount', 'Unit', 'With', 'Note', 'Category', 'kcal (est.)', 'Protein g', 'Carbs g', 'Fat g'] : ['תאריך', 'יום', 'ארוחה', 'מאכל', 'כמות', 'יחידה', 'עם', 'הערה', 'קטגוריה', 'קק״ל (הערכה)', 'חלבון ג׳', 'פחמימות ג׳', 'שומן ג׳']];
+  const nc = (it) => { const x = itemN(it); return x.unknown ? ['', '', '', ''] : [Math.round(x.k), gr(x.p), gr(x.c), gr(x.f)]; };
   dates.forEach(iso => {
     const d = db.days[iso]; if (!d) return;
-    MEALS.forEach(m => d.meals[m].forEach(it => rows.push([P.displayDate(iso), P.weekdayName(iso), MEAL[m].label, it.name, it.qty == null ? '' : it.qty, it.unit ? P.unitName(it.unit) : '', (it.with || []).join(' + '), it.note || '', catLabel(catOf(it.name))])));
+    MEALS.forEach(m => d.meals[m].forEach(it => rows.push([P.displayDate(iso), P.weekdayName(iso), MEAL[m].label, it.name, it.qty == null ? '' : it.qty, it.unit ? P.unitName(it.unit) : '', (it.with || []).join(' + '), it.note || '', catLabel(catOf(it.name))].concat(nc(it)))));
+    const wk = weightOn(iso);
+    if (wk) rows.push([P.displayDate(iso), P.weekdayName(iso), tr('משקל', 'Weight'), tr('משקל', 'Weight'), wk, tr('ק״ג', 'kg'), '', '', '']);
     const wml = drinksMl(d);
     if (wml) rows.push([P.displayDate(iso), P.weekdayName(iso), tr('מים', 'Water'), tr('מים', 'Water'), wml, tr('מ״ל', 'ml'), '', '', catLabel('drink')]);
     const g = dayGym(d);
@@ -1218,10 +1251,12 @@ const ACT = {
     else q = q <= 0.5 ? null : (q <= 1 ? q - 0.5 : q - 1);
     EDIT.it.qty = q;
     $('#eQtyVal').textContent = q == null ? '–' : P.fmtQty(q);
+    refreshEditNut();
   },
   eHalf() {
     EDIT.it.qty = (EDIT.it.qty == null ? 1 : EDIT.it.qty) + 0.5;
     $('#eQtyVal').textContent = P.fmtQty(EDIT.it.qty);
+    refreshEditNut();
   },
   editTo(el) { EDIT.to = el.dataset.v; $$('[data-act="editTo"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === EDIT.to)); },
   eSave() {
@@ -1486,9 +1521,9 @@ const ON = {
   dayNote: debounce((el) => { const d = getDay(S.date, true); d.note = el.value; cleanupDay(S.date); save(); }, 400),
   addText(el) { ADD.text = el.value; const live = $('#addLive'); if (live) live.innerHTML = addLiveHtml(); },
   histSearch: debounce((el) => { S.histQuery = el.value; S.histLimit = 40; render({ keepScroll: true }); const i = $('[data-on="histSearch"]'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250),
-  eName(el) { EDIT.it.name = el.value; },
-  eUnit(el) { EDIT.it.unit = el.value || null; if (EDIT.it.unit && EDIT.it.qty == null) { EDIT.it.qty = 1; $('#eQtyVal').textContent = '1'; } },
-  eWith(el) { EDIT.it.with = el.value.split(/[,،]/).map(s => s.trim()).filter(Boolean).map(canonical); },
+  eName(el) { EDIT.it.name = el.value; refreshEditNut(); },
+  eUnit(el) { EDIT.it.unit = el.value || null; if (EDIT.it.unit && EDIT.it.qty == null) { EDIT.it.qty = 1; $('#eQtyVal').textContent = '1'; } refreshEditNut(); },
+  eWith(el) { EDIT.it.with = el.value.split(/[,،]/).map(s => s.trim()).filter(Boolean).map(canonical); refreshEditNut(); },
   eNote(el) { EDIT.it.note = el.value.trim(); },
   dim(el) { db.settings.dim = +el.value; applyTheme(); saveLater(); },
   blur(el) { db.settings.blur = +el.value; applyTheme(); saveLater(); },
@@ -1578,10 +1613,11 @@ document.addEventListener('submit', (e) => {
   e.preventDefault();
   if (e.target.dataset.form === 'add') ACT.addTyped();
   if (e.target.dataset.form === 'gym') gymSubmit();
+  if (e.target.dataset.form === 'weight') weightSubmit();
   if (e.target.dataset.form === 'chat') { const t = e.target.querySelector('textarea'); aiSend(t ? t.value : AI.draft); }
 });
-Object.assign(ACT, AI_ACT, GYM_ACT);
-Object.assign(ON, AI_ON, GYM_ON);
+Object.assign(ACT, AI_ACT, GYM_ACT, NUT_ACT, WT_ACT);
+Object.assign(ON, AI_ON, GYM_ON, NUT_ON, WT_ON);
 $('#datePicker').addEventListener('change', (e) => { if (e.target.value) setDate(e.target.value); });
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (db.settings.theme === 'auto') applyTheme(); });
 

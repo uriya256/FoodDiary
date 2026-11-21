@@ -90,7 +90,8 @@ function aiDiaryContext() {
   const recent = dates.slice().reverse();
   let txt = '', n = 0;
   for (const iso of recent) {
-    const t = dayText(iso);
+    const d = db.days[iso];
+    const t = dayText(iso) + (nutOn() && hasFood(d) ? '\n• ' + tr('הערכת תזונה: ', 'Nutrition estimate: ') + nutLine(d) : '');
     if (txt.length + t.length > 45000) break;
     txt = t + '\n\n' + txt; n++;
   }
@@ -117,9 +118,15 @@ ${aiSet().allowLog ? `
 LOGGING — when the user tells you they ate or drank something and it is not already in the diary for that day, add it with a tag (one tag per meal):
 <log date="YYYY-MM-DD" meal="breakfast|lunch|dinner|snack">items in the user's words, e.g. 2 פרוסות לחם, חביתה</log>
 For water: <water date="YYYY-MM-DD" ml="250"/>
-For a gym workout they did (exercises, sets x reps, kg, minutes), one tag per day: <workout date="YYYY-MM-DD">exercises in the user's words, e.g. סקוואט 4x8 80 קג, הליכון 20 דקות</workout>
+For a gym workout they did (exercises, sets x reps, kg, minutes), one tag per day: <workout date="YYYY-MM-DD">exercises in the user's words, e.g. סקוואט 4x8 80 קג, ריצה 5 קמ 28:30</workout>
+When they tell you their body weight: <weight date="YYYY-MM-DD" kg="82.4"/>
 If the meal isn't clear, choose by time (before 11:00 breakfast, 11–16 lunch, 16–21 dinner, otherwise snack). Don't log things they only plan or consider eating.` : ''}
 Tags are hidden from the user and handled by the app; mention briefly in words what you saved or logged.
+
+NUTRITION: the "Nutrition estimate" lines are the app's rough estimates from average food values and usual portions, not measurements; say so when it matters. ${nutSet().goal ? `Daily calorie goal: ${nutSet().goal} kcal (weekly ${weekGoal()}).` : 'No calorie goal set.'} Target split carbs/protein/fat: ${nutSet().target.c}/${nutSet().target.p}/${nutSet().target.f}%. Today so far: ${hasFood(db.days[iso]) ? nutLine(db.days[iso]) : 'nothing logged'}.
+
+WEIGHT LOG (kg):
+${weightContext()}
 
 WATER: daily goal ${w.goalMl} ml; today so far ${dayWaterMl(db.days[iso])} ml; main bottle ${mainBottle().ml} ml; glass ${w.cupMl} ml.
 
@@ -139,11 +146,11 @@ function aiContents() {
 }
 
 /* ---------- tags the model writes ---------- */
-const TAG_RE = /<(remember)>([\s\S]*?)<\/remember>|<forget\s+id="([^"]+)"\s*\/?>(?:<\/forget>)?|<log\s+([^>]*)>([\s\S]*?)<\/log>|<water\s+([^>]*?)\/?>(?:<\/water>)?|<workout\b([^>]*)>([\s\S]*?)<\/workout>/g;
+const TAG_RE = /<(remember)>([\s\S]*?)<\/remember>|<forget\s+id="([^"]+)"\s*\/?>(?:<\/forget>)?|<log\s+([^>]*)>([\s\S]*?)<\/log>|<water\s+([^>]*?)\/?>(?:<\/water>)?|<workout\b([^>]*)>([\s\S]*?)<\/workout>|<weight\s+([^>]*?)\/?>(?:<\/weight>)?/g;
 function attrs(s) { const o = {}; String(s || '').replace(/(\w+)="([^"]*)"/g, (m, k, v) => { o[k] = v; }); return o; }
 function stripTags(text) {
   return text.replace(TAG_RE, '')
-    .replace(/<(remember|log|water|forget|workout)\b[^]*$/i, '') // a tag still streaming in
+    .replace(/<(remember|log|water|forget|workout|weight)\b[^]*$/i, '') // a tag still streaming in
     .replace(/\n{3,}/g, '\n\n').trim();
 }
 function applyTags(raw, msg) {
@@ -186,6 +193,11 @@ function applyTags(raw, msg) {
         if (r.minutes && !g.minutes) g.minutes = r.minutes;
         actions.push({ type: 'workout', date, ids: added.map(x => x.id), text: added.map(x => window.Gym.exText(x)).join(', ') });
       }
+    } else if (m[9] != null && aiSet().allowLog) {
+      const a = attrs(m[9]);
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') ? a.date : todayISO();
+      const kg = parseFloat(String(a.kg || '').replace(',', '.'));
+      if (kg >= 20 && kg <= 400) { const prev = weightOn(date); setWeight(date, kg); actions.push({ type: 'weight', date, kg, prev }); }
     }
   }
   msg.actions = actions;
@@ -198,6 +210,7 @@ function undoAction(msg, i) {
   else if (a.type === 'forget' && a.fact) ai.memory.push(a.fact);
   else if (a.type === 'log') { const d = getDay(a.date, false); if (d) { d.meals[a.meal] = d.meals[a.meal].filter(x => !a.ids.includes(x.id)); cleanupDay(a.date); } }
   else if (a.type === 'workout') { const d = getDay(a.date, false); if (d && d.gym) { d.gym.ex = d.gym.ex.filter(x => !a.ids.includes(x.id)); pruneGym(a.date); } }
+  else if (a.type === 'weight') setWeight(a.date, a.prev || 0);
   else if (a.type === 'water') { const d = getDay(a.date, false); if (d && d.drinks) { const k = d.drinks.findIndex(x => x.ml === a.ml && x.t === a.t); if (k >= 0) d.drinks.splice(k, 1); cleanupDay(a.date); } }
   a.undone = true;
   save();
@@ -228,8 +241,9 @@ function actionCard(msg, i) {
     : a.type === 'forget' ? [`נמחק מהזיכרון: ${a.text}`, `Forgot: ${a.text}`]
     : a.type === 'log' ? [`נוסף ל${mealName} (${d}): ${a.text}`, `Added to ${mealName} (${d}): ${a.text}`]
     : a.type === 'workout' ? [`נוסף לאימון (${d}): ${a.text}`, `Added to workout (${d}): ${a.text}`]
+    : a.type === 'weight' ? [`נרשם משקל (${d}): ${a.kg} ק״ג`, `Weight logged (${d}): ${a.kg} kg`]
     : [`נוספו ${fmtAmount(a.ml)} מים (${d})`, `Added ${fmtAmount(a.ml)} of water (${d})`];
-  const ic = { remember: 'brain', forget: 'brain', log: 'book', water: 'drop', workout: 'dumbbell' }[a.type];
+  const ic = { remember: 'brain', forget: 'brain', log: 'book', water: 'drop', workout: 'dumbbell', weight: 'scale' }[a.type];
   return `<div class="aact ${a.undone ? 'undone' : ''}">${icon(ic, 16)}<span class="grow">${a.type === 'workout' ? gymHtml(tr(label[0], label[1])) : esc(tr(label[0], label[1]))}</span>${a.undone ? `<span class="small">${tr('בוטל', 'Undone')}</span>` : `<button class="linkbtn" data-act="aiUndo" data-id="${msg.id}" data-i="${i}">${tr('ביטול', 'Undo')}</button>`}</div>`;
 }
 function bubble(m) {

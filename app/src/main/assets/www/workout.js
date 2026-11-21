@@ -189,12 +189,17 @@ function exBlockHtml(e, i, isPr) {
   const last = lastTimeOf(e.name, WK.iso);
   let h = `<div class="gx" data-i="${i}">
     <div class="gx-head"><span class="gdot" style="background:${exColor(e.name)}"></span><b class="grow" dir="auto">${esc(GY.displayName(e.name))}</b>${isPr ? `<span class="pr">${icon('trophy', 14)}${tr('שיא!', 'PR!')}</span>` : ''}
+      ${last ? `<button class="iconbtn flat" data-act="exProg" data-name="${esc(e.name)}" aria-label="${tr('התקדמות ב', 'Progress in ')}${esc(GY.displayName(e.name))}">${icon('chart', 18)}</button>` : ''}
       <button class="iconbtn flat" data-act="gDelEx" data-i="${i}" aria-label="${tr('מחיקת התרגיל', 'Delete exercise')} ${esc(GY.displayName(e.name))}">${icon('trash', 18)}</button></div>`;
   if (last) h += `<div class="gprev">${icon('history', 14)}<span>${tr('בפעם הקודמת', 'Last time')} (${esc(P.displayDate(last.date))}): ${gymHtml(GY.exDetail(last.ex) || '–')}</span></div>`;
   if (e.kind === 'c') {
-    h += `<div class="row" style="gap:10px">
-      <label class="field grow"><span>${tr('דקות', 'Minutes')}</span><input class="gnum" type="number" inputmode="decimal" min="0" step="any" data-on="gC" data-i="${i}" data-f="minutes" value="${e.minutes == null ? '' : e.minutes}"></label>
-      <label class="field grow"><span>${tr('ק״מ (לא חובה)', 'km (optional)')}</span><input class="gnum" type="number" inputmode="decimal" min="0" step="any" data-on="gC" data-i="${i}" data-f="km" value="${e.km == null ? '' : e.km}"></label></div>`;
+    const mm = e.minutes == null ? '' : Math.floor(e.minutes + 1e-6);
+    const ss = e.minutes == null ? '' : Math.round((e.minutes - Math.floor(e.minutes + 1e-6)) * 60);
+    h += `<div class="row" style="gap:8px">
+      <label class="field grow"><span>${tr('ק״מ', 'km')}</span><input class="gnum" type="number" inputmode="decimal" min="0" step="any" data-on="gC" data-i="${i}" data-f="km" value="${e.km == null ? '' : e.km}" placeholder="–"></label>
+      <label class="field grow"><span>${tr('דקות', 'Minutes')}</span><input class="gnum" type="number" inputmode="numeric" min="0" data-on="gT" data-i="${i}" data-f="m" value="${mm}"></label>
+      <label class="field grow"><span>${tr('שניות', 'Seconds')}</span><input class="gnum" type="number" inputmode="numeric" min="0" max="59" data-on="gT" data-i="${i}" data-f="s" value="${ss || ''}" placeholder="0"></label></div>
+      <div class="small muted gpace" data-pace="${i}">${paceHtml(e)}</div>`;
   } else {
     const sets = e.sets || [];
     h += `<div class="gsets"><span class="gh">${tr('סט', 'Set')}</span><span class="gh">${tr('חזרות', 'Reps')}</span><span class="gh">${e.kind === 'r' ? tr('תוספת ק״ג', 'Added kg') : tr('ק״ג', 'kg')}</span><span></span>
@@ -253,6 +258,112 @@ function applyRoutine(iso, r) {
   if (!g.title) g.title = r.name;
   save();
 }
+
+function paceHtml(e) {
+  const p = GY.paceOf(e);
+  return p ? tr(`קצב: <b dir="ltr">${GY.clock(p)}</b> דקות לק״מ · ${fmtKmh(e)} קמ״ש`, `Pace: <b>${GY.clock(p)}</b> min/km · ${fmtKmh(e)} km/h`) : (e.km == null ? tr('אם תכתוב ק״מ וזמן, נחשב את הקצב', 'Add km and time to see your pace') : '');
+}
+function fmtKmh(e) { return (Math.round(e.km / (e.minutes / 60) * 10) / 10).toLocaleString(LANG === 'en' ? 'en-US' : 'he-IL'); }
+
+/* ---------- progress of one exercise ---------- */
+function exHistory(name) {
+  const out = [];
+  for (const d of gymDates()) {
+    for (const e of db.days[d].gym.ex) {
+      if (e.name !== name) continue;
+      const ok = e.kind === 'c' ? e.minutes != null || e.km != null : (e.sets || []).some(x => x.reps != null || x.kg != null);
+      if (ok) out.push({ date: d, ex: e });
+    }
+  }
+  return out;
+}
+function epley(e) { return Math.max(0, ...(e.sets || []).map(x => (+x.kg || 0) * (1 + Math.min(+x.reps || 0, 12) / 30))); }
+function openExProg(name) {
+  openSheet('exprog', exProgHtml(name), { full: true, title: GY.displayName(name) });
+}
+function weeksText(days) {
+  if (days < 14) return tr(`${days} ימים`, `${days} days`);
+  const w = Math.round(days / 7 * 10) / 10;
+  return tr(`${w.toLocaleString('he-IL')} שבועות`, `${w} weeks`);
+}
+function exProgHtml(name) {
+  const H = exHistory(name);
+  const nm = GY.displayName(name);
+  let h = sheetHead(tr(`התקדמות: ${nm}`, `Progress: ${nm}`)) + `<div class="body">`;
+  if (!H.length) return h + `<p class="muted">${tr('עוד אין נתונים לתרגיל הזה.', 'No data for this exercise yet.')}</p></div>`;
+  const kind = H[H.length - 1].ex.kind;
+  const tile = (big, lbl, color) => `<div class="tile"><div class="big"${color ? ` style="color:${color}"` : ''}>${big}</div><div class="lbl">${lbl}</div></div>`;
+  const first = H[0], last = H[H.length - 1];
+  const span = daysBetween(first.date, last.date);
+  if (kind === 's' || kind === 'r') {
+    const val = (e) => kind === 's' ? exMaxKg(e) : exMaxReps(e);
+    const pts = H.map(x => ({ d: x.date, v: val(x.ex) })).filter(p => p.v > 0);
+    const unit = kind === 's' ? tr('ק״ג', 'kg') : tr('חזרות', 'reps');
+    if (pts.length) {
+      const a = pts[0], b = pts[pts.length - 1], best = Math.max(...pts.map(p => p.v));
+      // each time the top weight went above everything before = one step up
+      let top = a.v; const ups = [];
+      pts.slice(1).forEach(p => { if (p.v > top) { ups.push(p.d); top = p.v; } });
+      const gaps = ups.map((d, i) => daysBetween(i ? ups[i - 1] : a.d, d));
+      const avgGap = gaps.length ? gaps.reduce((x, y) => x + y, 0) / gaps.length : null;
+      const diff = Math.round((b.v - a.v) * 10) / 10;
+      h += `<div class="prog-sum">
+        ${tile(tr(`${fmtN1(a.v)} ← ${fmtN1(b.v)}`, `${fmtN1(a.v)} → ${fmtN1(b.v)}`), tr(`${unit}: מ-${P.displayDate(a.d)} עד היום`, `${unit}: ${P.displayDate(a.d)} to now`))}
+        ${tile(`${diff > 0 ? '+' : ''}${fmtN1(diff)}`, tr(`${unit} ב-${weeksText(span)}`, `${unit} in ${weeksText(span)}`), diff > 0 ? '#2F8F5A' : '')}
+        ${tile(fmtN1(best), tr(`הכי ${kind === 's' ? 'כבד' : 'הרבה'} (${unit})`, `best (${unit})`), '#D9467A')}
+        ${tile(avgGap != null ? weeksText(Math.round(avgGap)) : '–', avgGap != null ? tr(`בממוצע בין העלאות (${ups.length} ${ups.length === 1 ? 'העלאה' : 'העלאות'})`, `on average between increases (${ups.length})`) : tr('עוד לא העלית', 'No increase yet'))}
+      </div>`;
+      if (span >= 14 && diff) h += `<p class="small" style="margin:0">${tr(`בממוצע ${diff > 0 ? '+' : ''}${fmtN1(diff / (span / 30.44))} ${unit} בחודש.`, `On average ${diff > 0 ? '+' : ''}${fmtN1(diff / (span / 30.44))} ${unit} a month.`)}${kind === 's' && epley(last.ex) ? ' ' + tr(`חזרה אחת מקסימלית משוערת: ${fmtN1(Math.round(epley(last.ex) * 2) / 2)} ק״ג.`, `Estimated one-rep max: ${fmtN1(Math.round(epley(last.ex) * 2) / 2)} kg.`) : ''}</p>`;
+      if (pts.length > 1) h += lineChartSvg(pts, { color: '#D9467A', fmt: v => fmtN1(Math.round(v * 2) / 2), label: tr(`גרף ${unit}`, `${unit} chart`) });
+    }
+  } else {
+    const runs = H.filter(x => GY.paceOf(x.ex));
+    if (runs.length) {
+      const paces = runs.map(x => ({ d: x.date, v: GY.paceOf(x.ex) }));
+      const totKm = runs.reduce((a, x) => a + x.ex.km, 0), totMin = runs.reduce((a, x) => a + x.ex.minutes, 0);
+      const avg = totMin / totKm;
+      const best = Math.min(...paces.map(p => p.v));
+      const lp = paces[paces.length - 1].v, fp = paces[0].v;
+      const imp = fp - lp;
+      h += `<div class="prog-sum">
+        ${tile(`<span dir="ltr">${GY.clock(avg)}</span>`, tr(`קצב ממוצע לק״מ (${runs.length} פעמים)`, `average pace per km (${runs.length} times)`))}
+        ${tile(`<span dir="ltr">${GY.clock(lp)}</span>`, tr('קצב בפעם האחרונה', 'pace last time'))}
+        ${tile(`<span dir="ltr">${GY.clock(best)}</span>`, tr('הקצב הכי מהיר', 'fastest pace'), '#D9467A')}
+        ${tile(runs.length > 1 ? `<span dir="ltr">${imp >= 0 ? '−' : '+'}${GY.clock(Math.abs(imp))}</span>` : '–', runs.length > 1 ? tr(imp >= 0 ? 'מהר יותר לק״מ מהפעם הראשונה' : 'איטי יותר לק״מ מהפעם הראשונה', imp >= 0 ? 'faster per km than the first time' : 'slower per km than the first time') : tr('אחרי עוד פעם נראה שיפור', 'Do it again to see a change'), runs.length > 1 && imp > 0 ? '#2F8F5A' : '')}
+      </div>`;
+      // the distance done most often (e.g. always 5 km): time for that distance
+      const byKm = {};
+      runs.forEach(x => { const k = Math.round(x.ex.km * 2) / 2; (byKm[k] = byKm[k] || []).push(x); });
+      const common = Object.keys(byKm).sort((a, b) => byKm[b].length - byKm[a].length)[0];
+      const same = byKm[common];
+      if (same && same.length >= 2) {
+        const times = same.map(x => x.ex.minutes);
+        const avgT = times.reduce((a, b) => a + b, 0) / times.length;
+        const recent = times.slice(-3), early = times.slice(0, Math.min(3, times.length - recent.length || 1));
+        const rAvg = recent.reduce((a, b) => a + b, 0) / recent.length, eAvg = early.reduce((a, b) => a + b, 0) / early.length;
+        h += `<div class="section-t">${tr(`${fmtN1(+common)} ק״מ (${same.length} פעמים)`, `${fmtN1(+common)} km (${same.length} times)`)}</div>
+          <div class="prog-sum">
+            ${tile(`<span dir="ltr">${GY.clock(avgT)}</span>`, tr('זמן ממוצע', 'average time'))}
+            ${tile(`<span dir="ltr">${GY.clock(Math.min(...times))}</span>`, tr('הכי מהר', 'fastest'), '#D9467A')}
+            ${tile(`<span dir="ltr">${GY.clock(times[times.length - 1])}</span>`, tr('בפעם האחרונה', 'last time'))}
+            ${times.length >= 4 ? tile(`<span dir="ltr">${eAvg - rAvg >= 0 ? '−' : '+'}${GY.clock(Math.abs(eAvg - rAvg))}</span>`, tr('ממוצע 3 האחרונות מול הראשונות', 'last 3 average vs the first ones'), eAvg > rAvg ? '#2F8F5A' : '') : tile(`<span dir="ltr">${GY.clock(times[0])}</span>`, tr('בפעם הראשונה', 'first time'))}
+          </div>`;
+      }
+      if (paces.length > 1) h += `<div class="section-t">${tr('קצב לק״מ (למעלה = מהר יותר)', 'Pace per km (higher = faster)')}</div>` + lineChartSvg(paces, { color: '#2C8FB5', invert: true, minPad: 0.1, fmt: v => GY.clock(v), label: tr('גרף קצב', 'Pace chart') });
+    } else {
+      const pts = H.filter(x => x.ex.minutes).map(x => ({ d: x.date, v: x.ex.minutes }));
+      if (pts.length) {
+        const avg = pts.reduce((a, p) => a + p.v, 0) / pts.length;
+        h += `<div class="prog-sum">${tile(fmtN1(Math.round(avg)), tr('דקות בממוצע', 'minutes on average'))}${tile(fmtN1(Math.round(Math.max(...pts.map(p => p.v)))), tr('הכי ארוך (דקות)', 'longest (min)'), '#D9467A')}</div>
+          <p class="small muted" style="margin:0">${tr('כדי לראות קצב, כתוב גם מרחק, למשל: ריצה 5 קמ 28:30', 'To see your pace, add the distance too, e.g. run 5 km 28:30')}</p>`;
+        if (pts.length > 1) h += lineChartSvg(pts, { color: '#2C8FB5', fmt: v => fmtN1(Math.round(v)), label: tr('גרף דקות', 'Minutes chart') });
+      }
+    }
+  }
+  h += `<div class="section-t">${tr('כל הפעמים', 'Every time')}</div><div class="list">${H.slice().reverse().map(x => `<div class="li"><span class="grow"><span class="t">${gymHtml(GY.exDetail(x.ex) || '–')}</span><br><span class="s">${P.weekdayName(x.date)}, ${P.displayDate(x.date)}</span></span></div>`).join('')}</div>`;
+  return h + `</div><footer><button class="btn primary big block" data-act="closeSheet">${tr('סגירה', 'Close')}</button></footer>`;
+}
+function fmtN1(n) { return (Math.round(n * 10) / 10).toLocaleString(LANG === 'en' ? 'en-US' : 'he-IL', { maximumFractionDigits: 1 }); }
 
 /* ---------- rest timer ---------- */
 const REST = { end: 0, total: 0, timer: null };
@@ -336,10 +447,10 @@ function gymStatsHtml(dates) {
   if (prog.length) {
     h += `<div class="section-t" style="margin:8px 0 6px">${tr('התקדמות במשקל (המשקל הכי כבד, בפעם הראשונה בתקופה ובאחרונה)', 'Weight progress (heaviest weight, first time in the period vs latest)')}</div><div class="list">${prog.map(([n, a, b]) => {
       const d = Math.round((b - a) * 100) / 100;
-      return `<div class="li"><span class="gdot" style="background:${exColor(n)}"></span><span class="grow t" dir="auto">${esc(GY.displayName(n))}</span><span class="small">${tr(`${a} ← ${b} ק״ג`, `${a} → ${b} kg`)}</span><span class="gdelta ${d > 0 ? 'up' : d < 0 ? 'down' : ''}" dir="ltr">${d > 0 ? '+' : ''}${d}</span></div>`;
+      return `<button class="li" data-act="exProg" data-name="${esc(n)}"><span class="gdot" style="background:${exColor(n)}"></span><span class="grow t" dir="auto">${esc(GY.displayName(n))}</span><span class="small">${tr(`${a} ← ${b} ק״ג`, `${a} → ${b} kg`)}</span><span class="gdelta ${d > 0 ? 'up' : d < 0 ? 'down' : ''}" dir="ltr">${d > 0 ? '+' : ''}${d}</span></button>`;
     }).join('')}</div>`;
   }
-  h += `<div class="section-t" style="margin:12px 0 8px">${tr('התרגילים הכי נפוצים', 'Most done exercises')}</div><div class="stack">${top.map(n => `<div class="barrow"><div class="row between"><span dir="auto">${esc(GY.displayName(n))}</span><span class="muted small">${count[n]} ${plural(count[n], 'פעם', 'פעמים', 'time', 'times')}</span></div><div class="bar"><i style="width:${Math.round(count[n] / maxC * 100)}%;background:${exColor(n)}"></i></div></div>`).join('')}</div>`;
+  h += `<div class="section-t" style="margin:12px 0 8px">${tr('התרגילים הכי נפוצים', 'Most done exercises')}</div><div class="stack">${top.map(n => `<button class="barrow plain-btn" data-act="exProg" data-name="${esc(n)}"><div class="row between"><span dir="auto">${esc(GY.displayName(n))}</span><span class="muted small">${count[n]} ${plural(count[n], 'פעם', 'פעמים', 'time', 'times')}</span></div><div class="bar"><i style="width:${Math.round(count[n] / maxC * 100)}%;background:${exColor(n)}"></i></div></button>`).join('')}</div>`;
   const grs = Object.keys(GY.GROUPS).filter(gr => groupDays[gr]);
   if (grs.length > 1) {
     h += `<div class="section-t" style="margin:12px 0 8px">${tr('כמה אימונים כל אזור קיבל', 'Workouts per body area')}</div><div class="stack">${grs.map(gr => `<div class="barrow"><div class="row between"><span>${groupLabel(gr)}</span><span class="muted small">${groupDays[gr]}</span></div><div class="bar"><i style="width:${Math.round(groupDays[gr] / gd.length * 100)}%;background:${GROUP_COLOR[gr]}"></i></div></div>`).join('')}</div>`;
@@ -438,6 +549,7 @@ const GYM_ACT = {
   },
   gRest() { restStart(gymSet().rest); gymBuzz(); },
   gRestStop() { restStop(); },
+  exProg(el) { openExProg(el.dataset.name); },
   gGrp(el) { WK.grp = el.dataset.v; const f = $('#gymFind'); if (f) f.innerHTML = findHtml(); },
   gRestAdd() { if (REST.end && restLeft() > 0) restStart(restLeft() + 30, REST.total + 30); },
   gRestDef(el) { gymSet().rest = +el.dataset.v; save(); render({ keepScroll: true }); },
@@ -463,10 +575,18 @@ const GYM_ON = {
     x[el.dataset.f] = numOrNull(el.value);
     saveLater();
   },
-  gC(el) { const g = gymOf(WK.iso, true); const e = g.ex[+el.dataset.i]; if (!e) return; e[el.dataset.f] = numOrNull(el.value); saveLater(); },
+  gC(el) { const g = gymOf(WK.iso, true); const e = g.ex[+el.dataset.i]; if (!e) return; e[el.dataset.f] = numOrNull(el.value); saveLater(); updPace(el.dataset.i, e); },
+  gT(el) {
+    const g = gymOf(WK.iso, true); const e = g.ex[+el.dataset.i]; if (!e) return;
+    const m = numOrNull(($(`#sheets [data-on="gT"][data-i="${el.dataset.i}"][data-f="m"]`) || {}).value);
+    const sc = numOrNull(($(`#sheets [data-on="gT"][data-i="${el.dataset.i}"][data-f="s"]`) || {}).value);
+    e.minutes = m == null && sc == null ? null : Math.round(((m || 0) + Math.min(sc || 0, 59) / 60) * 1000) / 1000;
+    saveLater(); updPace(el.dataset.i, e);
+  },
   gText(el) { WK.text = el.value; const live = $('#gymLive'); if (live) live.innerHTML = gymLiveHtml(); },
   gFind(el) { WK.find = el.value; const f = $('#gymFind'); if (f) f.innerHTML = findHtml(); },
 };
+function updPace(i, e) { const el = $(`#sheets [data-pace="${i}"]`); if (el) el.innerHTML = paceHtml(e); }
 function gymSubmit() {
   const inp = $('#sheets [data-on="gText"]');
   if (inp) WK.text = inp.value;
