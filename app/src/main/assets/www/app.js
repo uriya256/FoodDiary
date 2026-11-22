@@ -968,6 +968,7 @@ function importHtml() {
 }
 function scanBoxHtml() {
   const app = !!(A && A.ocrCamera);
+  if (window.__IOS) return scanBoxIosHtml();
   return `<div class="scanbox">
     <div class="row" style="gap:10px"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span><b class="grow">${tr('מפתק שכתבת ביד', 'From a handwritten note')}</b></div>
     ${app ? `<div class="section-t" style="margin:0">${icon('sparkle', 16)} ${tr('Google Lens · הכי מדויק לכתב יד', 'Google Lens · best for handwriting')}</div>
@@ -977,6 +978,24 @@ function scanBoxHtml() {
     </div>
     <div class="small muted">${tr('התמונה נפתחת ב-Lens. שם לוחצים "טקסט", "בחירת הכל" ו"העתקה", וחוזרים לכאן (כפתור "חזור"). הטקסט נכנס לבד; אם לא, לוחצים "הדבק מהלוח".', 'The photo opens in Lens. Tap "Text", "Select all" and "Copy", then come back here (Back button). The text is pasted for you; if not, tap "Paste from clipboard".')}</div>
     <div class="section-t" style="margin:6px 0 0">${tr('בלי אינטרנט · לאותיות דפוס ברורות', 'Offline · clear block letters only')}</div>
+    <div class="row" style="gap:8px">
+      <button class="btn grow" data-act="ocrCam">${icon('camera', 18)}${tr('צילום', 'Camera')}</button>
+      <button class="btn grow" data-act="ocrGal">${icon('image', 18)}${tr('מהגלריה', 'Gallery')}</button>
+    </div>` : ''}
+    <button class="btn soft block" data-act="pasteClip">${icon('paste', 18)}${tr('הדבק מהלוח', 'Paste from clipboard')}</button>
+  </div>
+  <div class="small muted">${tr('בכל דרך, הטקסט מופיע כאן למטה. בדוק ותקן אותו לפני הניתוח, כדי שיישמר בדיוק מה שכתבת.', 'Either way, the text appears below. Check and fix it before reading it in, so exactly what you wrote is saved.')}</div>`;
+}
+/** iPhone: Lens lives in the Google app; Apple's own text recognition only when it reads Hebrew. */
+function scanBoxIosHtml() {
+  let he = false;
+  try { he = !!(A.ocrHebrew && A.ocrHebrew()); } catch (e) { }
+  return `<div class="scanbox">
+    <div class="row" style="gap:10px"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span><b class="grow">${tr('מפתק שכתבת ביד', 'From a handwritten note')}</b></div>
+    <div class="section-t" style="margin:0">${icon('sparkle', 16)} ${tr('Google Lens · הכי מדויק לכתב יד', 'Google Lens · best for handwriting')}</div>
+    <button class="btn primary block" data-act="lensCam">${icon('camera', 18)}${tr('פתח את Google Lens', 'Open Google Lens')}</button>
+    <div class="small muted">${tr('נפתחת אפליקציית Google. לוחצים על סמל המצלמה בשורת החיפוש, מצלמים את הפתק, בוחרים "טקסט", "בחירת הכל" ו"העתקה", וחוזרים לכאן. הטקסט נכנס לבד; אם לא, לוחצים "הדבק מהלוח". צריך את אפליקציית Google מה-App Store.', 'The Google app opens. Tap the camera icon in the search bar, photograph the note, choose "Text", "Select all" and "Copy", then come back here. The text is pasted for you; if not, tap "Paste from clipboard". Needs the Google app from the App Store.')}</div>
+    ${he ? `<div class="section-t" style="margin:6px 0 0">${tr('בלי אינטרנט · זיהוי של אפל', 'Offline · Apple text recognition')}</div>
     <div class="row" style="gap:8px">
       <button class="btn grow" data-act="ocrCam">${icon('camera', 18)}${tr('צילום', 'Camera')}</button>
       <button class="btn grow" data-act="ocrGal">${icon('image', 18)}${tr('מהגלריה', 'Gallery')}</button>
@@ -1672,7 +1691,8 @@ window.onSharedText = (text) => { while (sheetStack.length) closeSheet(); setTim
 window.onOcrStart = () => toast(tr('קורא את התמונה… זה יכול לקחת כמה שניות', 'Reading the photo… this can take a few seconds'));
 function startLens(source) {
   if (!A || !A.photo) return;
-  IMP.clipBefore = A.readClipboard ? A.readClipboard() : '';
+  // on iPhone reading the clipboard asks permission, so it is read only once something new was copied
+  IMP.clipBefore = window.__IOS ? '' : (A.readClipboard ? A.readClipboard() : '');
   A.photo('lens', source);
 }
 window.onLensOpened = () => { IMP.awaitClip = true; IMP.awaitSince = Date.now(); };
@@ -1683,7 +1703,7 @@ function checkLensClipboard() {
   let tries = 0;
   const tick = () => {
     if (!IMP.awaitClip) { IMP.checking = false; return; }
-    const c = A.readClipboard();
+    const c = window.__IOS ? (A.clipboardChanged && A.clipboardChanged() ? A.readClipboard() : '') : A.readClipboard();
     if (c && c.trim() && c !== IMP.clipBefore) {
       IMP.awaitClip = false;
       if (!sheetStack.find(s => s.id === 'import')) openImport(IMP.mode || 'day');
@@ -1699,7 +1719,7 @@ window.addEventListener('focus', checkLensClipboard);
 window.onOcrText = (text, status, detail) => {
   if (status === 'cancel') return;
   if (status === 'nocamera') { toast(tr('לא הצלחתי לפתוח את המצלמה', "Couldn't open the camera") + (detail ? ` (${detail})` : '')); return; }
-  if (status === 'nolens') { toast(tr('לא נמצאה אפליקציית Google עם Lens. אפשר להתקין "Google" מחנות Play', 'No Google app with Lens found. You can install "Google" from the Play Store')); return; }
+  if (status === 'nolens') { toast(window.__IOS ? tr('לא נמצאה אפליקציית Google. אפשר להתקין "Google" מה-App Store', 'The Google app was not found. You can install "Google" from the App Store') : tr('לא נמצאה אפליקציית Google עם Lens. אפשר להתקין "Google" מחנות Play', 'No Google app with Lens found. You can install "Google" from the Play Store')); return; }
   if (text == null) {
     const why = detail === 'image' ? tr('לא הצלחתי לפתוח את התמונה', "Couldn't open the photo")
       : detail === 'data' ? tr('קובצי הזיהוי חסרים באפליקציה', 'Recognition files are missing in the app')

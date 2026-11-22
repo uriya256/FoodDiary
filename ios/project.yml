@@ -1,0 +1,57 @@
+name: FoodDiary
+options:
+  bundleIdPrefix: com.uriya
+  deploymentTarget:
+    iOS: "15.0"
+  developmentLanguage: he
+targets:
+  FoodDiary:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: FoodDiary
+      # the same web app as the Android version
+      - path: ../app/src/main/assets/www
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.uriya.fooddiary
+        PRODUCT_NAME: FoodDiary
+        MARKETING_VERSION: "1.15"
+        CURRENT_PROJECT_VERSION: "17"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGN_IDENTITY: ""
+        DEVELOPMENT_TEAM: ""
+    info:
+      path: FoodDiary/Info.plist
+      properties:
+        CFBundleDisplayName: "יומן אוכל"
+        CFBundleName: FoodDiary
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: he
+        CFBundleLocalizations: [he, en]
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UIRequiredDeviceCapabilities: [arm64]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIViewControllerBasedStatusBarAppearance: true
+        UILaunchScreen:
+          UIColorName: LaunchBg
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+        LSApplicationQueriesSchemes: [google, googleapp]
+        NSCameraUsageDescription: "כדי לצלם פתק שכתבת או תמונת רקע"
+        NSPhotoLibraryUsageDescription: "כדי לבחור תמונה של פתק או תמונת רקע"
+        NSPhotoLibraryAddUsageDescription: "כדי לשמור תמונות שתבחר"

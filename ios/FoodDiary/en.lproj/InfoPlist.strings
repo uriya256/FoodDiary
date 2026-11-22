@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "Food Diary";
+"NSCameraUsageDescription" = "To photograph a note you wrote or a background picture";
+"NSPhotoLibraryUsageDescription" = "To pick a photo of a note or a background picture";
+"NSPhotoLibraryAddUsageDescription" = "To save photos you choose";

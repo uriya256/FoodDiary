@@ -1,0 +1,69 @@
+name: Build iPhone app
+
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - 'app/src/main/assets/www/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the Xcode project
+        run: cd ios && xcodegen generate
+      - name: Build (unsigned; Sideloadly or AltStore signs it with your Apple ID)
+        run: |
+          cd ios
+          set +e
+          xcodebuild -project FoodDiary.xcodeproj -target FoodDiary -configuration Release -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build > build.log 2>&1
+          status=$?
+          grep -E "error:|warning: .*/ios/FoodDiary/" build.log | head -80
+          tail -25 build.log
+          exit $status
+      - name: Package FoodDiary.ipa
+        run: |
+          cd ios
+          test -f build/Release-iphoneos/FoodDiary.app/www/index.html
+          mkdir -p Payload
+          cp -R build/Release-iphoneos/FoodDiary.app Payload/
+          /usr/libexec/PlistBuddy -c "Print" Payload/FoodDiary.app/Info.plist | head -60
+          zip -qry ../FoodDiary.ipa Payload
+          ls -la ../FoodDiary.ipa
+      - name: Apple text recognition languages (for the offline note reader)
+        continue-on-error: true
+        run: |
+          cat > /tmp/langs.swift <<'EOF'
+          import Vision
+          let r = VNRecognizeTextRequest()
+          r.recognitionLevel = .accurate
+          print((try? r.supportedRecognitionLanguages()) ?? [])
+          EOF
+          swift /tmp/langs.swift
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FoodDiary-IPA
+          path: FoodDiary.ipa
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: FoodDiary (latest build)
+          body: "אנדרואיד: מורידים את FoodDiary.apk ומתקינים בטלפון. אייפון: FoodDiary.ipa, מתקינים מהמחשב עם Sideloadly (הוראות ב-README)."
+          files: FoodDiary.ipa
+          make_latest: true

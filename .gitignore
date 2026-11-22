@@ -6,3 +6,8 @@ local.properties
 app/src/main/assets/tessdata/
 signing/
 *.keystore
+ios/build/
+ios/Payload/
+ios/*.xcodeproj/
+ios/FoodDiary/Info.plist
+ios/build.log

@@ -58,6 +58,6 @@ jobs:
         with:
           tag_name: latest
           name: FoodDiary (latest build)
-          body: "מורידים את FoodDiary.apk ומתקינים בטלפון."
+          body: "אנדרואיד: מורידים את FoodDiary.apk ומתקינים בטלפון. אייפון: FoodDiary.ipa, מתקינים מהמחשב עם Sideloadly (הוראות ב-README)."
           files: FoodDiary.apk
           make_latest: true
