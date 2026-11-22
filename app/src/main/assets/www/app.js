@@ -1429,17 +1429,41 @@ const ACT = {
     });
   },
   wMain(el) { W().mainBottle = el.dataset.id; save(); render({ keepScroll: true }); },
-  bPreset(el) { const i = $('[data-on="bMl"]'); if (i) i.value = el.dataset.v; },
+  bPreset(el) {
+    const i = $('[data-on="bMl"]'); if (i) i.value = el.dataset.v;
+    $$('#sheets [data-act="bPreset"]').forEach(c => c.classList.toggle('sel', c === el));
+  },
+  bStep(el) {
+    const i = $('[data-on="bMl"]'); if (!i) return;
+    const v = Math.max(50, Math.min(5000, (Math.round((+i.value || 0) / 10) * 10) + (+el.dataset.d)));
+    i.value = v;
+    $$('#sheets [data-act="bPreset"]').forEach(c => c.classList.toggle('sel', +c.dataset.v === v));
+  },
+  bMain(el) { W().mainBottle = el.dataset.id; ACT.bSave(el); },
+  bDel(el) {
+    const w = W(); const b = w.bottles.find(x => x.id === el.dataset.id); if (!b || w.bottles.length < 2) return;
+    const i = w.bottles.indexOf(b);
+    const wasMain = w.mainBottle === b.id;
+    w.bottles.splice(i, 1); W();
+    if (DRINK.src === b.id) { const m = mainBottle(); DRINK.src = m.id; DRINK.frac = 1; DRINK.ml = m.ml; }
+    save(); closeSheet();
+    if (sheetStack.find(x => x.id === 'drinks')) replaceSheetBody('drinks', drinksHtml());
+    render({ keepScroll: true });
+    toast(tr(`נמחק: ${bottleName(b)}`, `Deleted: ${bottleName(b)}`), { label: tr('ביטול', 'Undo'), fn: () => { w.bottles.splice(i, 0, b); if (wasMain) w.mainBottle = b.id; save(); render({ keepScroll: true }); } });
+  },
   bSave(el) {
     const w = W();
     const name = (($('[data-on="bName"]') || {}).value || '').trim();
     const ml = Math.max(50, Math.min(5000, Math.round(+(($('[data-on="bMl"]') || {}).value) || 0)));
     if (!ml) { toast(tr('צריך נפח', 'Size is needed')); return; }
     const id = el.dataset.id;
-    if (id) { const b = w.bottles.find(x => x.id === id); if (b) { b.name = name; b.ml = ml; } }
+    if (id === 'cup') { w.cupMl = Math.max(50, Math.min(1000, ml)); if (DRINK.src === 'cup') { DRINK.frac = 1; DRINK.ml = w.cupMl; } }
+    else if (id) { const b = w.bottles.find(x => x.id === id); if (b) { b.name = name; b.ml = ml; } if (DRINK.src === id) { DRINK.frac = 1; DRINK.ml = ml; } }
     else { const nb = { id: 'b' + uid(), name, ml }; w.bottles.push(nb); if (sheetStack.find(x => x.id === 'drinks')) { DRINK.src = nb.id; DRINK.frac = 1; DRINK.ml = ml; } }
-    save(); closeSheet();
-    if (sheetStack.find(x => x.id === 'drinks')) replaceSheetBody('drinks', drinksHtml()); else render({ keepScroll: true });
+    save(); syncWaterNative(); closeSheet();
+    if (sheetStack.find(x => x.id === 'drinks')) replaceSheetBody('drinks', drinksHtml());
+    render({ keepScroll: true });
+    toast(id === 'cup' ? tr(`גודל הכוס: ${w.cupMl} מ״ל`, `Glass size: ${w.cupMl} ml`) : tr(`נשמר: ${name || bottleName({})} · ${ml} מ״ל`, `Saved: ${name || bottleName({})} · ${ml} ml`));
   },
   wGoal(el) { const w = W(); w.goalMl = Math.max(500, Math.min(6000, w.goalMl + (+el.dataset.d))); save(); render({ keepScroll: true }); },
   wCup(el) { const w = W(); w.cupMl = Math.max(100, Math.min(600, w.cupMl + (+el.dataset.d))); save(); render({ keepScroll: true }); },
@@ -1542,7 +1566,8 @@ const ON = {
     save(); toast(tr(`"${n}" עבר ל${catLabel(el.value)}`, `"${n}" moved to ${catLabel(el.value)}`));
   },
   promptVal() { },
-  drinkMl(el) { DRINK.ml = +el.value; updateDrinkLabels(); },
+  drinkMl(el) { DRINK.ml = +el.value; DRINK.frac = null; $$('[data-act="drinkFrac"]').forEach(b => b.setAttribute('aria-pressed', 'false')); updateDrinkLabels(); },
+  drinkMlNum(el) { const v = Math.round(+el.value || 0); if (v >= 10 && v <= 5000) { DRINK.ml = v; DRINK.frac = null; $$('[data-act="drinkFrac"]').forEach(b => b.setAttribute('aria-pressed', 'false')); updateDrinkLabels(); } },
   wWake(el) { W().wake = el.value || '07:00'; save(); },
   wSleep(el) { W().sleep = el.value || '23:00'; save(); },
   bName() { },

@@ -163,7 +163,7 @@ function waterCardHtml(iso) {
         <div class="wtotal"><b>${fmtL(total)}</b><span> / ${fmtL(w.goalMl)} ${tr('ליטר', 'L')}</span></div>
         <div class="wpace ${pace.kind}">${pace.text}</div>
         ${fromMeals ? `<div class="small muted">${tr(`כולל ${fmtAmount(fromMeals)} שנרשמו בארוחות`, `Includes ${fmtAmount(fromMeals)} logged in meals`)}</div>` : ''}
-        <div class="small muted" style="margin-top:2px">${esc(bottleName(b))} · ${fmtAmount(b.ml)}</div>
+        <button class="wbottle" data-act="editBottle" data-id="${b.id}" aria-label="${tr('עריכת נפח הבקבוק', 'Edit bottle size')}">${icon('bottle', 15)}<span>${esc(bottleName(b))} · ${fmtAmount(b.ml)}</span>${icon('edit', 14)}</button>
         <div class="wquick">
           ${q.map(([f, l]) => `<button class="wq" data-act="drink" data-ml="${roundMl(b.ml * f)}"><b>${l}</b><span dir="ltr">+${roundMl(b.ml * f)}</span></button>`).join('')}
           <button class="wq cup" data-act="drink" data-ml="${w.cupMl}">${icon('glass', 18)}<span dir="ltr">+${w.cupMl}</span></button>
@@ -214,9 +214,11 @@ function drinksHtml() {
     <div class="section-t">${tr('ממה שתית?', 'What did you drink from?')}</div>
     <div class="chips" style="margin-top:0">${drinkSources().map(x => `<button class="chip ${x.id === src.id ? 'sel' : ''}" data-act="drinkSrc" data-id="${x.id}">${icon(x.bottle ? 'bottle' : 'glass', 16)}${esc(x.name)} · ${x.ml}</button>`).join('')}
       <button class="chip ghost" data-act="addBottle">${icon('plus', 16)}${tr('בקבוק חדש', 'New bottle')}</button></div>
+    <button class="linkbtn" style="align-self:flex-start" data-act="editBottle" data-id="${src.id}">${icon('edit', 14)} ${src.bottle ? tr(`עריכת "${esc(src.name)}" (${src.ml} מ״ל)`, `Edit "${esc(src.name)}" (${src.ml} ml)`) : tr(`שינוי גודל הכוס (${src.ml} מ״ל)`, `Change glass size (${src.ml} ml)`)}</button>
     ${src.bottle ? `<div class="section-t">${tr('כמה מהבקבוק?', 'How much of it?')}</div><div class="seg">${fr.map(([f, l]) => `<button data-act="drinkFrac" data-v="${f}" aria-pressed="${DRINK.frac === f}">${l}</button>`).join('')}</div>` : ''}
-    <label class="field"><span>${tr('כמות מדויקת', 'Exact amount')}: <b id="drinkMlLbl">${DRINK.ml} ${tr('מ״ל', 'ml')}</b></span>
-      <input type="range" min="50" max="2000" step="10" value="${DRINK.ml}" data-on="drinkMl"></label>
+    <div class="field"><span>${tr('כמות מדויקת', 'Exact amount')}: <b id="drinkMlLbl">${DRINK.ml} ${tr('מ״ל', 'ml')}</b></span>
+      <div class="row" style="gap:10px"><input class="grow" type="range" min="50" max="2000" step="10" value="${DRINK.ml}" data-on="drinkMl" aria-label="${tr('כמות', 'Amount')}">
+      <input class="gnum" style="width:92px;flex:none" type="number" inputmode="numeric" min="10" max="5000" step="10" value="${DRINK.ml}" data-on="drinkMlNum" aria-label="${tr('כמות במ״ל', 'Amount in ml')}"></div></div>
     <button class="btn primary big block" data-act="drinkAdd">${icon('plus', 20)}<span id="drinkAddLbl">${tr(`הוסף ${DRINK.ml} מ״ל`, `Add ${DRINK.ml} ml`)}</span></button>
     <div class="section-t">${tr('שתייה היום', 'Today’s drinks')} · ${fmtAmount(drinksMl(day))}</div>
     ${list.length ? `<div class="list">${list.map((x, i) => `<div class="li"><span class="grow"><span class="t">${fmtAmount(x.ml)}</span>${x.t ? `<br><span class="s">${x.t}</span>` : ''}</span><button class="iconbtn plain" data-act="delDrink" data-i="${i}" aria-label="${tr('מחיקה', 'Delete')}">${icon('trash', 18)}</button></div>`).join('')}</div>` : `<div class="small muted">${tr('עוד לא נרשמה שתייה ביום הזה.', 'No drinks logged for this day yet.')}</div>`}
@@ -227,6 +229,7 @@ function updateDrinkLabels() {
   const a = $('#drinkMlLbl'); if (a) a.textContent = `${DRINK.ml} ${tr('מ״ל', 'ml')}`;
   const b = $('#drinkAddLbl'); if (b) b.textContent = tr(`הוסף ${DRINK.ml} מ״ל`, `Add ${DRINK.ml} ml`);
   const r = $('[data-on="drinkMl"]'); if (r) r.value = DRINK.ml;
+  const n = $('[data-on="drinkMlNum"]'); if (n && document.activeElement !== n) n.value = DRINK.ml;
 }
 
 /* ---------- settings ---------- */
@@ -262,13 +265,20 @@ function waterSettingsHtml() {
 }
 function bottleSheet(id) {
   const w = W();
-  const b = w.bottles.find(x => x.id === id) || { id: null, name: '', ml: 750 };
-  openSheet('bottle', sheetHead(b.id ? tr('עריכת בקבוק', 'Edit bottle') : tr('בקבוק חדש', 'New bottle')) + `<div class="body">
-    <label class="field"><span>${tr('שם', 'Name')}</span><input type="text" data-on="bName" value="${esc(b.name)}" placeholder="${tr('למשל: הבקבוק הכחול', 'e.g. Blue bottle')}"></label>
-    <label class="field"><span>${tr('נפח (מ״ל)', 'Size (ml)')}</span><input type="number" inputmode="numeric" min="50" max="5000" step="10" data-on="bMl" value="${b.ml}"></label>
-    <div class="chips" style="margin-top:0">${[330, 500, 600, 750, 1000, 1500].map(v => `<button class="chip" data-act="bPreset" data-v="${v}">${v}</button>`).join('')}</div>
+  const cup = id === 'cup';
+  const b = cup ? { id: 'cup', name: '', ml: w.cupMl } : (w.bottles.find(x => x.id === id) || { id: null, name: '', ml: 750 });
+  const presets = cup ? [150, 200, 250, 300, 350, 400] : [330, 500, 600, 700, 750, 800, 1000, 1500, 2000];
+  openSheet('bottle', sheetHead(cup ? tr('גודל הכוס', 'Glass size') : b.id ? tr('עריכת בקבוק', 'Edit bottle') : tr('בקבוק חדש', 'New bottle')) + `<div class="body">
+    ${cup ? '' : `<label class="field"><span>${tr('שם', 'Name')}</span><input type="text" data-on="bName" value="${esc(b.name)}" placeholder="${tr('למשל: הבקבוק הכחול', 'e.g. Blue bottle')}"></label>`}
+    <div class="field"><span>${tr('נפח (מ״ל)', 'Size (ml)')}</span>
+      <div class="stepper big-step"><button class="iconbtn plain" data-act="bStep" data-d="-50" aria-label="${tr('פחות 50', '50 less')}">${icon('minus', 20)}</button>
+        <input class="gnum" type="number" inputmode="numeric" min="50" max="5000" step="10" data-on="bMl" value="${b.ml}" aria-label="${tr('נפח במ״ל', 'Size in ml')}">
+        <button class="iconbtn plain" data-act="bStep" data-d="50" aria-label="${tr('עוד 50', '50 more')}">${icon('plus', 20)}</button></div></div>
+    <div class="chips" style="margin-top:0">${presets.map(v => `<button class="chip ${v === b.ml ? 'sel' : ''}" data-act="bPreset" data-v="${v}">${v}</button>`).join('')}</div>
+    ${!cup && b.id && b.id !== w.mainBottle ? `<button class="btn soft" data-act="bMain" data-id="${b.id}">${icon('star', 18)}${tr('להפוך לבקבוק הראשי', 'Make it the main bottle')}</button>` : ''}
+    <p class="small muted" style="margin:0">${cup ? tr('הכוס משמשת לכפתור הכוס ולתזכורת "שתיתי כוס".', 'The glass is used for the glass button and the "I drank a glass" reminder.') : tr('הבקבוק הראשי מופיע בכרטיס המים, והכפתורים ¼, ½ ומלא מחושבים לפי הנפח שלו.', 'The main bottle shows on the water card, and the ¼, ½ and Full buttons use its size.')}</p>
   </div>
-  <footer><button class="btn primary big block" data-act="bSave" data-id="${b.id || ''}">${tr('שמירה', 'Save')}</button></footer>`, { title: tr('בקבוק', 'Bottle') });
+  <footer>${!cup && b.id && w.bottles.length > 1 ? `<button class="btn" data-act="bDel" data-id="${b.id}">${icon('trash', 18)}${tr('מחיקה', 'Delete')}</button>` : ''}<button class="btn primary big grow" data-act="bSave" data-id="${b.id || ''}">${tr('שמירה', 'Save')}</button></footer>`, { title: tr('בקבוק', 'Bottle') });
 }
 
 /* ---------- reminders and the notification's "I drank a glass" button ---------- */

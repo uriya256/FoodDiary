@@ -581,3 +581,8 @@ button.li { width: 100%; border: none; background: none; text-align: start; colo
 html.dark .aact.warn { color: #F2C46B; }
 .aact b { font-weight: 700; }
 .li.cur { background: var(--a08); border-radius: 14px; padding-inline: 8px; }
+.wbottle { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; border: none; background: var(--chip); color: var(--muted); font: inherit; font-size: 12.5px; border-radius: 999px; padding: 5px 10px; min-height: 32px; margin-top: 2px; max-width: 100%; }
+.wbottle span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wbottle svg { flex-shrink: 0; }
+.stepper.big-step { display: flex; align-items: center; gap: 8px; }
+.stepper.big-step .gnum { flex: 1; font-size: 20px; min-height: 50px; }
