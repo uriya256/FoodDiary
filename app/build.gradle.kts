@@ -11,8 +11,8 @@ android {
         applicationId = "com.uriya.fooddiary"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "1.13"
+        versionCode = 16
+        versionName = "1.14"
         ndk {
             // phones only: keeps the APK smaller (the OCR engine ships native code per CPU type)
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")

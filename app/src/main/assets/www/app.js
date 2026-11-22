@@ -1466,13 +1466,23 @@ const ACT = {
     toast(id === 'cup' ? tr(`גודל הכוס: ${w.cupMl} מ״ל`, `Glass size: ${w.cupMl} ml`) : tr(`נשמר: ${name || bottleName({})} · ${ml} מ״ל`, `Saved: ${name || bottleName({})} · ${ml} ml`));
   },
   wGoal(el) { const w = W(); w.goalMl = Math.max(500, Math.min(6000, w.goalMl + (+el.dataset.d))); save(); render({ keepScroll: true }); },
+  waterGoal() { openSheet('wgoal', waterGoalHtml(), { title: tr('יעד מים', 'Water goal'), onClose: () => render({ keepScroll: true }) }); },
+  wGoalS(el) { const w = W(); w.goalMl = Math.max(500, Math.min(6000, w.goalMl + (+el.dataset.d))); save(); syncWaterNative(); replaceSheetBody('wgoal', waterGoalHtml()); },
+  wGoalSet(el) { W().goalMl = +el.dataset.v; save(); syncWaterNative(); replaceSheetBody('wgoal', waterGoalHtml()); },
+  wGoalWeight() {
+    const lw = weights().pop(); if (!lw) return;
+    const ml = Math.max(1500, Math.min(4000, Math.round(lw.kg * 33 / 250) * 250));
+    W().goalMl = ml; save(); syncWaterNative(); replaceSheetBody('wgoal', waterGoalHtml());
+    toast(tr(`היעד עודכן ל-${fmtL(ml)} ליטר. זו הערכה כללית; בחום או בפעילות צריך יותר`, `Goal set to ${fmtL(ml)} L. A rough guide; you need more in heat or when active`));
+  },
   wCup(el) { const w = W(); w.cupMl = Math.max(100, Math.min(600, w.cupMl + (+el.dataset.d))); save(); render({ keepScroll: true }); },
   wSuggest() {
     promptSheet(tr('הצעת יעד מים', 'Suggest a water goal'), tr('המשקל שלך (ק״ג)', 'Your weight (kg)'), '', (v) => {
       const kg = parseFloat(String(v).replace(',', '.'));
       if (!(kg > 25 && kg < 250)) { toast(tr('לא הבנתי את המשקל', "I didn't get the weight")); return; }
       const ml = Math.max(1500, Math.min(4000, Math.round(kg * 33 / 250) * 250));
-      W().goalMl = ml; save(); render({ keepScroll: true });
+      W().goalMl = ml; save(); syncWaterNative(); render({ keepScroll: true });
+      if (sheetStack.find(x => x.id === 'wgoal')) replaceSheetBody('wgoal', waterGoalHtml());
       toast(tr(`היעד עודכן ל-${fmtL(ml)} ליטר. זו הערכה כללית; בחום או בפעילות צריך יותר`, `Goal set to ${fmtL(ml)} L. A rough guide; you need more in heat or when active`));
     }, tr('חשב', 'Calculate'));
     setTimeout(() => { const i = $('[data-on="promptVal"]'); if (i) i.setAttribute('inputmode', 'decimal'); }, 50);

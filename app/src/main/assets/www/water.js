@@ -87,7 +87,7 @@ function waterPace(total, iso) {
   const left = goal - total;
   const b = mainBottle();
   const bottles = left / b.ml;
-  const leftTxt = tr(`נשארו ${fmtAmount(left)}`, `${fmtAmount(left)} to go`) + (bottles >= 0.4 ? tr(` (כ-${fmtBottles(bottles)} בקבוקים)`, ` (about ${fmtBottles(bottles)} ${bottles <= 1 ? 'bottle' : 'bottles'})`) : '');
+  const leftTxt = tr(`נשארו ${fmtAmount(left)}`, `${fmtAmount(left)} to go`) + (bottles >= 0.4 ? ` (${bottlesPhrase(bottles)})` : '');
   if (iso !== todayISO()) return { kind: 'past', text: leftTxt };
   const now = new Date().getHours() * 60 + new Date().getMinutes();
   const wake = hhmmToMin(w.wake), sleep = hhmmToMin(w.sleep);
@@ -104,6 +104,14 @@ function fmtBottles(x) {
   const r = Math.round(x * 2) / 2;
   if (r === 0.5) return tr('חצי', '½');
   return String(r);
+}
+/** "כחצי בקבוק", "כבקבוק אחד", "כבקבוק וחצי", "כ-2 בקבוקים" */
+function bottlesPhrase(x) {
+  const r = Math.max(0.5, Math.round(x * 2) / 2);
+  if (r === 0.5) return tr('כחצי בקבוק', 'about half a bottle');
+  if (r === 1) return tr('כבקבוק אחד', 'about 1 bottle');
+  if (r === 1.5) return tr('כבקבוק וחצי', 'about 1.5 bottles');
+  return tr(`כ-${r} בקבוקים`, `about ${r} bottles`);
 }
 
 /* ---------- the bottle drawing ---------- */
@@ -158,9 +166,10 @@ function waterCardHtml(iso) {
     <div class="row between"><h2 class="row">${icon('drop', 20, 'style="color:#2C8FB5"')}${tr('מים', 'Water')}</h2>
       <button class="iconbtn flat" data-act="openDrinks" aria-label="${tr('עוד אפשרויות שתייה', 'More drink options')}">${icon('dots')}</button></div>
     <div class="water-main">
-      <button class="bottle-btn" data-act="openDrinks" aria-label="${tr('הוספת שתייה', 'Add a drink')}">${bottleSvg(pct, from)}</button>
+      <button class="bottle-btn" data-act="openDrinks" aria-label="${tr('הוספת שתייה', 'Add a drink')}">${bottleSvg(pct, from)}<span class="bcap">${tr('מהיעד היומי', 'of daily goal')}</span></button>
       <div class="water-info">
-        <div class="wtotal"><b>${fmtL(total)}</b><span> / ${fmtL(w.goalMl)} ${tr('ליטר', 'L')}</span></div>
+        <div class="wtotal"><b>${fmtL(total)}</b><span> ${tr('ליטר שתית היום', 'L drunk today')}</span></div>
+        <button class="wgoal-btn" data-act="waterGoal">${tr(`היעד היומי: ${fmtL(w.goalMl)} ליטר`, `Daily goal: ${fmtL(w.goalMl)} L`)}${icon('edit', 13)}</button>
         <div class="wpace ${pace.kind}">${pace.text}</div>
         ${fromMeals ? `<div class="small muted">${tr(`כולל ${fmtAmount(fromMeals)} שנרשמו בארוחות`, `Includes ${fmtAmount(fromMeals)} logged in meals`)}</div>` : ''}
         <button class="wbottle" data-act="editBottle" data-id="${b.id}" aria-label="${tr('עריכת נפח הבקבוק', 'Edit bottle size')}">${icon('bottle', 15)}<span>${esc(bottleName(b))} · ${fmtAmount(b.ml)}</span>${icon('edit', 14)}</button>
@@ -279,6 +288,22 @@ function bottleSheet(id) {
     <p class="small muted" style="margin:0">${cup ? tr('הכוס משמשת לכפתור הכוס ולתזכורת "שתיתי כוס".', 'The glass is used for the glass button and the "I drank a glass" reminder.') : tr('הבקבוק הראשי מופיע בכרטיס המים, והכפתורים ¼, ½ ומלא מחושבים לפי הנפח שלו.', 'The main bottle shows on the water card, and the ¼, ½ and Full buttons use its size.')}</p>
   </div>
   <footer>${!cup && b.id && w.bottles.length > 1 ? `<button class="btn" data-act="bDel" data-id="${b.id}">${icon('trash', 18)}${tr('מחיקה', 'Delete')}</button>` : ''}<button class="btn primary big grow" data-act="bSave" data-id="${b.id || ''}">${tr('שמירה', 'Save')}</button></footer>`, { title: tr('בקבוק', 'Bottle') });
+}
+
+/** Daily goal, straight from the water card. */
+function waterGoalHtml() {
+  const w = W();
+  const lw = typeof weights === 'function' ? weights().pop() : null;
+  return sheetHead(tr('יעד מים יומי', 'Daily water goal')) + `<div class="body">
+    <p class="small muted" style="margin:0">${tr('כמה ליטר אתה רוצה לשתות ביום. הבקבוק בכרטיס מתמלא לפי היעד הזה, ולא לפי גודל הבקבוק שלך.', 'How many litres you want to drink a day. The bottle on the card fills by this goal, not by the size of your own bottle.')}</p>
+    <div class="stepper big-step"><button class="iconbtn plain" data-act="wGoalS" data-d="-250" aria-label="${tr('פחות', 'Less')}">${icon('minus', 20)}</button>
+      <span class="val grow" style="font-size:24px" id="wGoalVal">${fmtL(w.goalMl)} ${tr('ליטר', 'L')}</span>
+      <button class="iconbtn plain" data-act="wGoalS" data-d="250" aria-label="${tr('יותר', 'More')}">${icon('plus', 20)}</button></div>
+    <div class="chips" style="margin-top:0">${[1500, 2000, 2500, 3000, 3500].map(v => `<button class="chip ${v === w.goalMl ? 'sel' : ''}" data-act="wGoalSet" data-v="${v}">${fmtL(v)} ${tr('ל׳', 'L')}</button>`).join('')}</div>
+    <div class="small muted">${tr(`עם הבקבוק הראשי (${fmtAmount(mainBottle().ml)}) זה ${bottlesPhrase(w.goalMl / mainBottle().ml).replace(/^כ-?/, 'בערך ')} ביום.`, `With your main bottle (${fmtAmount(mainBottle().ml)}) that's ${bottlesPhrase(w.goalMl / mainBottle().ml)} a day.`)}</div>
+    ${lw ? `<button class="btn soft" data-act="wGoalWeight">${icon('sparkle', 18)}${tr(`הצע יעד לפי המשקל האחרון (${fmtKg(lw.kg)} ק״ג)`, `Suggest from your last weight (${fmtKg(lw.kg)} kg)`)}</button>` : `<button class="btn soft" data-act="wSuggest">${icon('sparkle', 18)}${tr('הצע יעד לפי משקל', 'Suggest a goal from my weight')}</button>`}
+  </div>
+  <footer><button class="btn primary big block" data-act="closeSheet">${tr('סיום', 'Done')}</button></footer>`;
 }
 
 /* ---------- reminders and the notification's "I drank a glass" button ---------- */
