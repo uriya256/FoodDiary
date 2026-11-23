@@ -603,3 +603,16 @@ html.ios body { -webkit-touch-callout: none; }
 .clrem input { width: 20px; height: 20px; accent-color: var(--accent); }
 .chip.amb { border-style: dashed; }
 .ambq { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #EFA43A; color: #fff; font-size: 12px; font-weight: 800; margin-inline-start: 2px; }
+
+/* Ministry of Health ranges */
+.mk { font-style: normal; font-weight: 800; margin-inline-start: 3px; font-size: 12px; }
+.mk.ok { color: #237A4B; } .mk.lo, .mk.hi { color: #B0452A; }
+html.dark .mk.ok { color: #7DDBA6; } html.dark .mk.lo, html.dark .mk.hi { color: #F4A08A; }
+.mohbox { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-top: 10px; }
+.mohtbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.mohtbl th, .mohtbl td { text-align: start; padding: 6px 3px; border-bottom: 1px solid var(--line); white-space: nowrap; font-weight: 400; }
+.mohtbl tbody th { font-weight: 700; }
+.mohtbl thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.mohtbl tbody th i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 5px; }
+.mohtbl tbody tr:last-child th, .mohtbl tbody tr:last-child td { border-bottom: 0; }
+.nw { white-space: nowrap; }

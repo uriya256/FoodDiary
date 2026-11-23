@@ -17,7 +17,60 @@ function nutSet() {
   const n = s.nut;
   if (n.show == null) n.show = true;
   if (!n.target || n.target.c + n.target.p + n.target.f !== 100) n.target = { c: 50, p: 25, f: 25 };
+  if (n.mode !== 'fixed') n.mode = 'moh';
   return n;
+}
+/** 'moh': the Ministry of Health ranges (the default); 'fixed': one split chosen by the user. */
+function isMoh() { return nutSet().mode === 'moh'; }
+function bal(pct) { const n = nutSet(); return n.mode === 'moh' ? NU.balanceRange(pct, NU.MOH) : NU.balance(pct, n.target); }
+function latestKg() { const L = typeof weights === 'function' ? weights() : []; return L.length ? L[L.length - 1].kg : null; }
+function rangeTxt(k) { return `${NU.MOH[k][0]}%–${NU.MOH[k][1]}%`; }
+function mohLine() { return ['c', 'p', 'f'].map(k => `<span class="nw">${mName(k)} ${rangeTxt(k)}</span>`).join(' · '); }
+/** ✓ inside the range, ↓ under it, ↑ over it. */
+function mark(st) {
+  if (st === 'ok') return `<em class="mk ok" aria-label="${tr('בטווח', 'in range')}">✓</em>`;
+  if (st === 'lo') return `<em class="mk lo" aria-label="${tr('מתחת לטווח', 'below range')}">↓</em>`;
+  if (st === 'hi') return `<em class="mk hi" aria-label="${tr('מעל הטווח', 'above range')}">↑</em>`;
+  return '';
+}
+function rangeState(k, v) { const [lo, hi] = NU.MOH[k]; return v < lo ? 'lo' : v > hi ? 'hi' : 'ok'; }
+function legendHtml(pct) {
+  if (!pct) return '';
+  const moh = isMoh();
+  return ['c', 'p', 'f'].map(k => `<span class="lg"><i style="background:${MACRO[k].color}"></i>${mName(k)} ${pct[k]}%${moh ? mark(rangeState(k, pct[k])) : ''}</span>`).join('');
+}
+function targetLineHtml() {
+  const n = nutSet();
+  if (n.mode === 'moh') return `<div class="small muted">${tr(`המלצת משרד הבריאות: ${mohLine()}`, `Ministry of Health ranges: ${mohLine()}`)}</div>`;
+  return `<div class="small muted">${tr(`היעד: ${n.target.c}% פחמימות · ${n.target.p}% חלבון · ${n.target.f}% שומן (הקווים על הפס)`, `Target: ${n.target.c}% carbs · ${n.target.p}% protein · ${n.target.f}% fat (lines on the bar)`)}</div>`;
+}
+/**
+ * The Ministry of Health check for a day (or a daily average): grams and share of each macro against the ranges,
+ * the ranges in grams for the calorie goal (or for what was eaten), and the protein minimum by body weight.
+ */
+function mohHtml(t, avg) {
+  const n = nutSet();
+  const pct = NU.macroPct(t);
+  if (!pct) return '';
+  const base = n.goal || t.k;
+  const G = NU.gramRange(base);
+  const g = tr('ג׳', 'g');
+  const rows = ['c', 'p', 'f'].map(k => `<tr><th scope="row"><i style="background:${MACRO[k].color}"></i>${mName(k)}</th>
+      <td>${gr(t[k])} ${g} · ${pct[k]}%${mark(rangeState(k, pct[k]))}</td><td>${rangeTxt(k)}</td><td>${Math.round(G[k][0])}–${Math.round(G[k][1])} ${g}</td></tr>`).join('');
+  const kg = latestKg();
+  let prot;
+  if (kg) {
+    const min = Math.round(kg * NU.MOH.proteinPerKg);
+    const st = t.p >= min ? 'ok' : 'lo';
+    prot = tr(`חלבון: לפחות ${NU.MOH.proteinPerKg} ג׳ לכל ק״ג משקל, כלומר כ-${min} ג׳ ביום למשקל ${fmtKg(kg)} ק״ג. ${avg ? 'בממוצע' : 'היום'}: ${gr(t.p)} ג׳`, `Protein: at least ${NU.MOH.proteinPerKg} g per kg of body weight, about ${min} g a day at ${fmtKg(kg)} kg. ${avg ? 'Average' : 'Today'}: ${gr(t.p)} g`) + mark(st);
+  } else prot = `${tr(`חלבון: מומלץ לפחות ${NU.MOH.proteinPerKg} ג׳ לכל ק״ג משקל גוף.`, `Protein: at least ${NU.MOH.proteinPerKg} g per kg of body weight.`)} <button class="linkbtn" data-act="openWeight">${tr('רישום משקל יחשב את זה בשבילך', 'Log your weight to work it out')}</button>`;
+  return `<div class="mohbox">
+    <div class="section-t" style="margin:0 0 4px">${tr('לפי המלצת משרד הבריאות', 'Ministry of Health recommendation')}</div>
+    <table class="mohtbl"><thead><tr><th></th><th>${avg ? tr('ממוצע ליום', 'Daily average') : tr('היום', 'Today')}</th><th>${tr('מומלץ', 'Range')}</th><th>${n.goal ? tr(`ליעד ${kc(base)}`, `For ${kc(base)}`) : tr('בגרמים', 'In grams')}</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="small muted" style="margin-top:6px">${n.goal ? tr(`הגרמים מחושבים לפי היעד היומי שלך, ${kc(base)} קק״ל.`, `Grams are worked out for your daily goal of ${kc(base)} kcal.`) : tr(`הגרמים מחושבים לפי ${kc(base)} קק״ל, ${avg ? 'הממוצע ליום' : 'מה שנאכל היום'}. עם יעד קלורי הם יחושבו לפי היעד.`, `Grams are worked out for ${kc(base)} kcal, ${avg ? 'the daily average' : 'what was eaten today'}. With a calorie goal they follow the goal.`)}</div>
+    <div class="small" style="margin-top:6px">${prot}</div>
+    <div class="small muted" style="margin-top:6px">${tr('משרד הבריאות קובע את הכמויות של רכיבי התזונה לפי טבלאות ה-DRI. קשת המזון עצמה ממליצה על סוגי המזון ועל התדירות: הרבה ירקות, פירות, דגנים מלאים וקטניות, ומעט מזון מעובד.', 'The Ministry of Health sets nutrient amounts by the DRI tables. The food rainbow itself recommends which foods and how often: plenty of vegetables, fruit, whole grains and legumes, and little processed food.')}</div>
+  </div>`;
 }
 function nutOn() { return nutSet().show !== false; }
 function weekGoal() { const n = nutSet(); return n.weekGoal || (n.goal ? n.goal * 7 : null); }
@@ -61,13 +114,13 @@ function macroBar(t, opts) {
   if (!pct) return '';
   const tg = nutSet().target;
   const seg = (k) => `<i style="width:${pct[k]}%;background:${MACRO[k].color}">${pct[k] >= (opts.big ? 13 : 18) ? `<b>${pct[k]}%</b>` : ''}</i>`;
-  const ticks = opts.ticks ? `<s style="inset-inline-start:${tg.c}%"></s><s style="inset-inline-start:${tg.c + tg.p}%"></s>` : '';
+  const ticks = opts.ticks && nutSet().mode !== 'moh' ? `<s style="inset-inline-start:${tg.c}%"></s><s style="inset-inline-start:${tg.c + tg.p}%"></s>` : '';
   return `<div class="mbar${opts.big ? ' big' : ''}" role="img" aria-label="${esc(macroText(pct))}">${seg('c')}${seg('p')}${seg('f')}${ticks}</div>`;
 }
 function macroText(pct) { return ['c', 'p', 'f'].map(k => `${mName(k)} ${pct[k]}%`).join(' · '); }
 function balanceBadge(t) {
   const pct = NU.macroPct(t);
-  const b = NU.balance(pct, nutSet().target);
+  const b = bal(pct);
   if (!b) return '';
   if (b.level === 'ok') return `<span class="bal ok">${icon('check', 13)}${tr('מאוזן', 'Balanced')}</span>`;
   const parts = [];
@@ -108,8 +161,8 @@ function nutDayCardHtml(iso) {
       </span>
     </button>`;
   if (pct) h += `${macroBar(t, { big: true, ticks: true })}
-    <div class="row between nut-leg"><span class="small">${['c', 'p', 'f'].map(k => `<span class="lg"><i style="background:${MACRO[k].color}"></i>${mName(k)} ${pct[k]}%</span>`).join('')}</span>${balanceBadge(t)}</div>
-    <div class="small muted">${tr(`היעד: ${n.target.c}% פחמימות · ${n.target.p}% חלבון · ${n.target.f}% שומן (הקווים על הפס)`, `Target: ${n.target.c}% carbs · ${n.target.p}% protein · ${n.target.f}% fat (lines on the bar)`)}</div>`;
+    <div class="row between nut-leg"><span class="small">${legendHtml(pct)}</span>${balanceBadge(t)}</div>
+    ${targetLineHtml()}`;
   const notes = [];
   if (wg) notes.push(`<span class="${wk > wg * 1.05 ? 'warn-t' : ''}">${tr(`השבוע: ${kc(wk)} מתוך ${kc(wg)} קק״ל`, `This week: ${kc(wk)} of ${kc(wg)} kcal`)}</span>`);
   if (t.guess || t.unknown) notes.push(`<button class="linkbtn" data-act="openNutDay">${t.unknown ? tr(`${t.unknown} בלי ערכים`, `${t.unknown} without values`) : tr(`${t.guess} לפי הערכה גסה`, `${t.guess} roughly guessed`)}</button>`);
@@ -131,6 +184,7 @@ function nutDayHtml() {
   const day = getDay(S.date, false);
   let h = sheetHead(tr('פירוט תזונתי', 'Nutrition breakdown') + ` · ${shortDate(S.date)}`) + `<div class="body">
     <p class="small muted" style="margin:0">${tr('הערכה לפי ערכים ממוצעים של מאכלים נפוצים וגודל מנה רגיל. לחיצה על מאכל מאפשרת לתקן את הערכים שלו, והתיקון חל על כל הימים.', 'Estimates from average values of common foods and usual portions. Tap a food to correct its values; the change applies to every day.')}</p>`;
+  if (isMoh() && hasFood(day)) h += mohHtml(dayN(day));
   for (const m of MEALS) {
     const items = day ? day.meals[m] : [];
     if (!items.length) continue;
@@ -184,7 +238,9 @@ function readNutForm() {
 /* ---------- settings ---------- */
 function nutSettingsHtml() {
   const n = nutSet();
-  const custom = !MACRO_PRESETS.some(([c, p, f]) => n.target.c === c && n.target.p === p && n.target.f === f);
+  const moh = n.mode === 'moh';
+  const custom = !moh && (S.nutCustom || !MACRO_PRESETS.some(([c, p, f]) => n.target.c === c && n.target.p === p && n.target.f === f));
+  const G = n.goal ? NU.gramRange(n.goal) : null;
   return `<section class="card stack" id="nutSettings">
     <h2 class="row">${icon('flame', 20)}${tr('קלוריות ואבות מזון', 'Calories and macros')}</h2>
     <div class="row between"><span>${tr('הצג הערכת קלוריות, חלבון, פחמימות ושומן', 'Show calorie, protein, carb and fat estimates')}</span>${sw('nutShow', n.show !== false, tr('הצג הערכת קלוריות', 'Show calorie estimates'))}</div>
@@ -195,13 +251,14 @@ function nutSettingsHtml() {
       </div>
       ${n.goal && n.goal < 1200 ? `<div class="small warn-t">${tr('יעד מתחת ל-1,200 קק״ל ביום נמוך מאוד למבוגרים. כדאי להתייעץ עם דיאטנית.', 'A goal under 1,200 kcal a day is very low for adults. Worth checking with a dietitian.')}</div>` : ''}
       <div class="field"><span>${tr('חלוקה רצויה: פחמימות / חלבון / שומן', 'Target split: carbs / protein / fat')}</span>
-        <div class="chips" style="margin-top:2px">${MACRO_PRESETS.map(([c, p, f]) => { const on = n.target.c === c && n.target.p === p && n.target.f === f && !S.nutCustom; return `<button class="chip${on ? ' sel' : ''}" data-act="nutPreset" data-v="${c},${p},${f}" aria-pressed="${on}"><span dir="ltr">${c}/${p}/${f}</span></button>`; }).join('')}<button class="chip${custom || S.nutCustom ? ' sel' : ''}" data-act="nutPreset" data-v="custom" aria-pressed="${custom || S.nutCustom === true}">${tr('אחר', 'Other')}</button></div>
+        <div class="chips" style="margin-top:2px"><button class="chip${moh ? ' sel' : ''}" data-act="nutPreset" data-v="moh" aria-pressed="${moh}">${tr('משרד הבריאות', 'Ministry of Health')}</button>${MACRO_PRESETS.map(([c, p, f]) => { const on = !moh && !custom && n.target.c === c && n.target.p === p && n.target.f === f; return `<button class="chip${on ? ' sel' : ''}" data-act="nutPreset" data-v="${c},${p},${f}" aria-pressed="${on}"><span dir="ltr">${c}/${p}/${f}</span></button>`; }).join('')}<button class="chip${custom ? ' sel' : ''}" data-act="nutPreset" data-v="custom" aria-pressed="${custom}">${tr('אחר', 'Other')}</button></div>
       </div>
-      <div class="row ${custom || S.nutCustom ? '' : 'hidden'}" style="gap:8px" id="nutCustom">
+      ${moh ? `<div class="small muted">${tr(`טווחים מהקלוריות: ${mohLine()}`, `Share of calories: ${mohLine()}`)}<br>${tr(`חלבון: לפחות ${NU.MOH.proteinPerKg} ג׳ לכל ק״ג משקל גוף.`, `Protein: at least ${NU.MOH.proteinPerKg} g per kg of body weight.`)}${G ? `<br>${tr(`ליעד של ${kc(n.goal)} קק״ל:`, `For ${kc(n.goal)} kcal:`)} ${['c', 'p', 'f'].map(k => `<span class="nw">${mName(k)} ${Math.round(G[k][0])}–${Math.round(G[k][1])} ${tr('ג׳', 'g')}</span>`).join(' · ')}` : ''}</div>` : ''}
+      <div class="row ${custom ? '' : 'hidden'}" style="gap:8px" id="nutCustom">
         ${['c', 'p', 'f'].map(k => `<label class="field grow"><span>${mName(k)} %</span><input class="gnum" type="number" inputmode="numeric" min="0" max="100" data-on="nutPct" data-k="${k}" value="${n.target[k]}"></label>`).join('')}
       </div>
       <div class="small muted" id="nutPctMsg"></div>
-      ${n.target.f < 20 ? `<div class="small muted">${tr('לרוב ממליצים על 20%–35% מהקלוריות משומן.', 'Guidelines usually suggest 20–35% of calories from fat.')}</div>` : ''}
+      ${!moh && n.target.f < 20 ? `<div class="small muted">${tr('לרוב ממליצים על 20%–35% מהקלוריות משומן.', 'Guidelines usually suggest 20–35% of calories from fat.')}</div>` : ''}
       <button class="btn" data-act="openFoods">${icon('list', 18)}${tr('תיקון ערכים של מאכלים', 'Correct food values')}</button>
       ${choicesHtml()}
       <p class="small muted" style="margin:0">${tr('המספרים הם הערכה לפי ערכים ממוצעים וגודל מנה רגיל, לא שקילה. מאכל שכתבת עם "גרם" נספר לפי המשקל שכתבת.', 'The numbers are estimates from average values and usual portions, not weighing. Foods written in grams count by the weight you wrote.')}</p>
@@ -231,7 +288,7 @@ function nutStatsHtml(dates) {
     const d = db.days[iso];
     const t = dayN(d);
     if (n.goal && t.k <= n.goal * 1.05) inGoal++;
-    const b = NU.balance(NU.macroPct(t), n.target);
+    const b = bal(NU.macroPct(t));
     if (b && b.level === 'ok') balanced++;
     for (const m of MEALS) for (const it of d.meals[m]) { const x = itemN(it); byFood[it.name] = (byFood[it.name] || 0) + x.k; }
   }
@@ -244,9 +301,10 @@ function nutStatsHtml(dates) {
       ${n.goal ? `<div class="tile"><div class="big">${inGoal}<span class="small muted"> / ${fd.length}</span></div><div class="lbl">${tr(`ימים ביעד (${kc(n.goal)})`, `days on goal (${kc(n.goal)})`)}</div></div>` : ''}
       <div class="tile"><div class="big" style="color:#2F8F5A">${balanced}<span class="small muted"> / ${fd.length}</span></div><div class="lbl">${tr('ימים מאוזנים', 'balanced days')}</div></div>
     </div>
-    <div class="section-t" style="margin:4px 0 6px">${tr('החלוקה הממוצעת מול היעד', 'Average split vs target')}</div>
+    <div class="section-t" style="margin:4px 0 6px">${n.mode === 'moh' ? tr('החלוקה הממוצעת מול המלצת משרד הבריאות', 'Average split vs the Ministry of Health ranges') : tr('החלוקה הממוצעת מול היעד', 'Average split vs target')}</div>
     ${macroBar(avg, { big: true, ticks: true })}
-    <div class="row between nut-leg"><span class="small">${(() => { const p = NU.macroPct(avg); return p ? ['c', 'p', 'f'].map(k => `<span class="lg"><i style="background:${MACRO[k].color}"></i>${mName(k)} ${p[k]}%</span>`).join('') : ''; })()}</span>${balanceBadge(avg)}</div>`;
+    <div class="row between nut-leg"><span class="small">${legendHtml(NU.macroPct(avg))}</span>${balanceBadge(avg)}</div>
+    ${n.mode === 'moh' ? mohHtml(avg, true) : ''}`;
   const wg = weekGoal();
   if (wg) {
     const weeks = [];
@@ -260,6 +318,13 @@ function nutStatsHtml(dates) {
   }
   if (topF.length) h += `<div class="section-t" style="margin:14px 0 8px">${tr('מה הביא הכי הרבה קלוריות', 'Where most calories came from')}</div><div class="stack">${topF.map(f => `<div class="barrow"><div class="row between"><span>${esc(f)}</span><span class="muted small">${kc(byFood[f])} ${tr('קק״ל', 'kcal')}</span></div><div class="bar"><i style="width:${Math.round(byFood[f] / maxF * 100)}%;background:#EFA43A"></i></div></div>`).join('')}</div>`;
   return h + `<p class="small muted" style="margin:10px 0 0">${tr('הערכה לפי ערכים ממוצעים.', 'Estimates from average values.')}</p></section>`;
+}
+/** The macro target in words, for the AI. */
+function nutTargetAi() {
+  const n = nutSet();
+  if (n.mode !== 'moh') return `Target split carbs/protein/fat: ${n.target.c}/${n.target.p}/${n.target.f}%.`;
+  const kg = latestKg();
+  return `Macro target: the Israeli Ministry of Health ranges (DRI): carbs 45-65%, protein 10-35%, fat 20-35% of calories; protein at least 0.8 g per kg of body weight${kg ? ` (${fmtKg(kg)} kg -> about ${Math.round(kg * 0.8)} g a day)` : ''}.` + (n.goal ? (() => { const G = NU.gramRange(n.goal); return ` For the ${n.goal} kcal goal: carbs ${Math.round(G.c[0])}-${Math.round(G.c[1])} g, protein ${Math.round(G.p[0])}-${Math.round(G.p[1])} g, fat ${Math.round(G.f[0])}-${Math.round(G.f[1])} g.`; })() : '');
 }
 /** One line for the AI and for history. */
 function nutLine(d) {
@@ -309,9 +374,12 @@ const NUT_ACT = {
   },
   nutShow() { const n = nutSet(); n.show = n.show === false; save(); render({ keepScroll: true }); },
   nutPreset(el) {
-    if (el.dataset.v === 'custom') { S.nutCustom = true; render({ keepScroll: true }); return; }
+    const n = nutSet();
+    if (el.dataset.v === 'moh') { S.nutCustom = false; n.mode = 'moh'; save(); render({ keepScroll: true }); return; }
+    n.mode = 'fixed';
+    if (el.dataset.v === 'custom') { S.nutCustom = true; save(); render({ keepScroll: true }); return; }
     const [c, p, f] = el.dataset.v.split(',').map(Number);
-    S.nutCustom = false; nutSet().target = { c, p, f }; save(); render({ keepScroll: true });
+    S.nutCustom = false; n.target = { c, p, f }; save(); render({ keepScroll: true });
   },
   nutGoalSheet() { nutGoalSheet(); },
 };

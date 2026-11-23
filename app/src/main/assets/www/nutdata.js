@@ -295,7 +295,37 @@ function balance(pct, target) {
   return { level, low, high, d };
 }
 
-const NUT_API = { NUT, NUT_EN, CAT_NUT, UNIT_G, nutFor, editWeightKey, gramsOf, itemNut, sumNut, macroPct, balance };
+/*
+ * Israel's Ministry of Health bases nutrient amounts on the DRI tables. For adults the acceptable share of calories is
+ * carbs 45-65%, protein 10-35%, fat 20-35%, and at least 0.8 g protein per kg of body weight.
+ * (The food rainbow itself recommends food groups and how often to eat them, not percentages.)
+ */
+const MOH = { c: [45, 65], p: [10, 35], f: [20, 35], proteinPerKg: 0.8 };
+/** Like balance(), against ranges: 'ok' when every macro is inside its range, 'near' within 10 points, else 'off'. */
+function balanceRange(pct, R) {
+  if (!pct) return null;
+  R = R || MOH;
+  const d = {};
+  let worst = 0, low = null, high = null;
+  for (const k of ['c', 'p', 'f']) {
+    const v = pct[k], lo = R[k][0], hi = R[k][1];
+    d[k] = v < lo ? v - lo : v > hi ? v - hi : 0;
+    worst = Math.max(worst, Math.abs(d[k]));
+    if (d[k] < 0 && (!low || d[k] < d[low])) low = k;
+    if (d[k] > 0 && (!high || d[k] > d[high])) high = k;
+  }
+  return { level: worst === 0 ? 'ok' : worst <= 10 ? 'near' : 'off', low, high, d };
+}
+/** Grams of each macro that fit the ranges for a number of calories (4 kcal per gram of carbs or protein, 9 of fat). */
+function gramRange(kcal, R) {
+  R = R || MOH;
+  const per = { c: 4, p: 4, f: 9 };
+  const o = {};
+  for (const k of ['c', 'p', 'f']) o[k] = [kcal * R[k][0] / 100 / per[k], kcal * R[k][1] / 100 / per[k]];
+  return o;
+}
+
+const NUT_API = { NUT, NUT_EN, CAT_NUT, UNIT_G, MOH, nutFor, editWeightKey, gramsOf, itemNut, sumNut, macroPct, balance, balanceRange, gramRange };
 if (typeof module !== 'undefined') module.exports = NUT_API;
 if (typeof window !== 'undefined') window.Nutri = NUT_API;
 })();

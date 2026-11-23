@@ -172,7 +172,7 @@ LOGGING from the chat is turned OFF in the app settings, so you cannot change th
 Tags are hidden from the user and handled by the app; mention briefly in words what you saved or logged.
 IMPORTANT: the diary changes ONLY through tags. Never say that you logged, added, updated, changed or deleted something unless the matching tags are in this same reply. If you cannot do something with the tags below, say so honestly.
 
-NUTRITION: the "Nutrition estimate" lines are the app's rough estimates from average food values and usual portions, not measurements; say so when it matters. ${nutSet().goal ? `Daily calorie goal: ${nutSet().goal} kcal (weekly ${weekGoal()}).` : 'No calorie goal set.'} Target split carbs/protein/fat: ${nutSet().target.c}/${nutSet().target.p}/${nutSet().target.f}%. Today so far: ${hasFood(db.days[iso]) ? nutLine(db.days[iso]) : 'nothing logged'}.
+NUTRITION: the "Nutrition estimate" lines are the app's rough estimates from average food values and usual portions, not measurements; say so when it matters. ${nutSet().goal ? `Daily calorie goal: ${nutSet().goal} kcal (weekly ${weekGoal()}).` : 'No calorie goal set.'} ${nutTargetAi()} Today so far: ${hasFood(db.days[iso]) ? nutLine(db.days[iso]) : 'nothing logged'}.
 
 WEIGHT LOG (kg):
 ${weightContext()}
