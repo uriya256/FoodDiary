@@ -272,7 +272,12 @@ function guessCat(name) {
   }
   return 'other';
 }
-function newItem(it) { return { id: uid(), name: it.name, qty: it.qty == null ? null : it.qty, unit: it.unit || null, with: it.with || [], note: it.note || '' }; }
+function newItem(it) {
+  const o = { id: uid(), name: it.name, qty: it.qty == null ? null : it.qty, unit: it.unit || null, with: it.with || [], note: it.note || '' };
+  if (it.said) o.said = it.said;
+  if (it.amb) o.amb = it.amb;
+  return o;
+}
 
 /* ---------------- app state ---------------- */
 const S = { bgCat: 'all', tab: 'today', date: todayISO(), statsRange: 7, statsMeal: '', histQuery: '', histMonth: todayISO().slice(0, 7), histLimit: 40 };
@@ -447,7 +452,7 @@ function itemChip(it, meal, idx) {
   const extra = [];
   if (it.with && it.with.length) extra.push(tr('עם ', 'with ') + P.joinVav(it.with));
   if (it.note) extra.push(it.note);
-  return `<button class="chip" data-act="editItem" data-meal="${meal}" data-idx="${idx}">${q ? `<span class="q">${esc(q)}</span>` : ''}<span>${esc(name)}</span>${extra.length ? `<span class="w">${esc(extra.join(' · '))}</span>` : ''}</button>`;
+  return `<button class="chip${it.amb ? ' amb' : ''}" data-act="editItem" data-meal="${meal}" data-idx="${idx}">${q ? `<span class="q">${esc(q)}</span>` : ''}<span>${esc(it.amb && it.said ? it.said : name)}</span>${extra.length ? `<span class="w">${esc(extra.join(' · '))}</span>` : ''}${it.amb ? `<span class="ambq" aria-label="${tr('לא ברור למה התכוונת', 'Not sure what you meant')}">?</span>` : ''}</button>`;
 }
 function streak() {
   let n = 0;
@@ -810,13 +815,18 @@ function addLiveHtml() {
   if (sugg.length) h += `<div class="chips">${sugg.map(n => `<button class="chip" data-act="quickAdd" data-name="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
   return h;
 }
-function addItemsToMeal(iso, meal, items, quiet) {
+/** quiet: no toast and no question; flag: mark general words ("כריך") with a "?" even when quiet (the chat). */
+function addItemsToMeal(iso, meal, items, quiet, flag) {
   const day = getDay(iso, true);
+  autoClarify(items, !quiet || flag);
   const added = items.map(newItem);
   day.meals[meal].push(...added);
   learnFoods(added);
   save();
-  if (!quiet) toast(tr('נוסף: ', 'Added: ') + added.map(it => P.formatItem(it, { short: true })).join(', '));
+  if (!quiet) {
+    toast(tr('נוסף: ', 'Added: ') + added.map(it => P.formatItem(it.amb && it.said ? Object.assign({}, it, { name: it.said }) : it, { short: true })).join(', '));
+    if (added.some(it => it.amb)) setTimeout(() => openClarify(iso, added), 280);
+  }
   return added;
 }
 
@@ -833,6 +843,7 @@ function editHtml() {
   const units = FD.UNIT_LIST.map(u => `<option value="${u}" ${it.unit === u ? 'selected' : ''}>${esc(P.unitName(u))}</option>`).join('');
   const seg = MEALS.map(x => `<button data-act="editTo" data-v="${x}" aria-pressed="${x === EDIT.to}">${MEAL[x].label}</button>`).join('');
   return sheetHead(tr('עריכת פריט', 'Edit item')) + `<div class="body">
+    ${editAmbHtml(it)}
     <label class="field"><span>${tr('מאכל', 'Food')}</span><input type="text" value="${esc(it.name)}" data-on="eName" list="foodNames" autocomplete="off"></label>
     <datalist id="foodNames">${allFoodNames().slice(0, 400).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <div class="row" style="gap:12px;align-items:flex-end">
@@ -1279,6 +1290,11 @@ const ACT = {
     refreshEditNut();
   },
   editTo(el) { EDIT.to = el.dataset.v; $$('[data-act="editTo"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === EDIT.to)); },
+  eAmb(el) {
+    applyAmb(EDIT.it, el.dataset.key, +el.dataset.i);
+    replaceSheetBody('edit', editHtml());
+  },
+  eAmbSkip() { delete EDIT.it.amb; replaceSheetBody('edit', editHtml()); },
   eSave() {
     const day = getDay(S.date, true);
     const it = EDIT.it;
@@ -1575,7 +1591,7 @@ const ON = {
   dayNote: debounce((el) => { const d = getDay(S.date, true); d.note = el.value; cleanupDay(S.date); save(); }, 400),
   addText(el) { ADD.text = el.value; const live = $('#addLive'); if (live) live.innerHTML = addLiveHtml(); },
   histSearch: debounce((el) => { S.histQuery = el.value; S.histLimit = 40; render({ keepScroll: true }); const i = $('[data-on="histSearch"]'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250),
-  eName(el) { EDIT.it.name = el.value; refreshEditNut(); },
+  eName(el) { EDIT.it.name = el.value; delete EDIT.it.said; delete EDIT.it.amb; refreshEditNut(); },
   eUnit(el) { EDIT.it.unit = el.value || null; if (EDIT.it.unit && EDIT.it.qty == null) { EDIT.it.qty = 1; $('#eQtyVal').textContent = '1'; } refreshEditNut(); },
   eWith(el) { EDIT.it.with = el.value.split(/[,،]/).map(s => s.trim()).filter(Boolean).map(canonical); refreshEditNut(); },
   eNote(el) { EDIT.it.note = el.value.trim(); },
@@ -1671,8 +1687,8 @@ document.addEventListener('submit', (e) => {
   if (e.target.dataset.form === 'weight') weightSubmit();
   if (e.target.dataset.form === 'chat') { const t = e.target.querySelector('textarea'); aiSend(t ? t.value : AI.draft); }
 });
-Object.assign(ACT, AI_ACT, GYM_ACT, NUT_ACT, WT_ACT);
-Object.assign(ON, AI_ON, GYM_ON, NUT_ON, WT_ON);
+Object.assign(ACT, AI_ACT, GYM_ACT, NUT_ACT, WT_ACT, CL_ACT);
+Object.assign(ON, AI_ON, GYM_ON, NUT_ON, WT_ON, CL_ON);
 $('#datePicker').addEventListener('change', (e) => { if (e.target.value) setDate(e.target.value); });
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (db.settings.theme === 'auto') applyTheme(); });
 

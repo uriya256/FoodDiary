@@ -594,3 +594,12 @@ html.dark .aact.warn { color: #F2C46B; }
 html.ios { -webkit-text-size-adjust: 100%; }
 html.ios * { -webkit-tap-highlight-color: transparent; }
 html.ios body { -webkit-touch-callout: none; }
+/* "what did you mean?" */
+.clcard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; background: rgba(var(--card-rgb), .6); }
+.clcard.done { border-color: rgba(47, 143, 90, .45); background: rgba(47, 143, 90, .07); }
+.clcard.soft { background: var(--chip); border-color: transparent; }
+.clcard .search { min-height: 44px; }
+.clrem { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); min-height: 36px; }
+.clrem input { width: 20px; height: 20px; accent-color: var(--accent); }
+.chip.amb { border-style: dashed; }
+.ambq { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #EFA43A; color: #fff; font-size: 12px; font-weight: 800; margin-inline-start: 2px; }

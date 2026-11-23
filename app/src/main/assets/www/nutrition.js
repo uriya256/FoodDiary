@@ -203,6 +203,7 @@ function nutSettingsHtml() {
       <div class="small muted" id="nutPctMsg"></div>
       ${n.target.f < 20 ? `<div class="small muted">${tr('לרוב ממליצים על 20%–35% מהקלוריות משומן.', 'Guidelines usually suggest 20–35% of calories from fat.')}</div>` : ''}
       <button class="btn" data-act="openFoods">${icon('list', 18)}${tr('תיקון ערכים של מאכלים', 'Correct food values')}</button>
+      ${choicesHtml()}
       <p class="small muted" style="margin:0">${tr('המספרים הם הערכה לפי ערכים ממוצעים וגודל מנה רגיל, לא שקילה. מאכל שכתבת עם "גרם" נספר לפי המשקל שכתבת.', 'The numbers are estimates from average values and usual portions, not weighing. Foods written in grams count by the weight you wrote.')}</p>
     </div>
   </section>`;

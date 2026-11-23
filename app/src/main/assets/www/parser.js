@@ -115,8 +115,10 @@
     const HOLDERS = new Set(['grain', 'whole', 'dish']);
     const FILLINGS = new Set(['dairy', 'legume', 'protein', 'nuts', 'sauce', 'veg', 'sweet']);
 
-    const start = (name, known) => {
+    const start = (name, known, said) => {
       cur = { name, qty: pQty, unit: pUnit, with: [], note: '', known };
+      // the words actually written, when they differ from the food's name ("גבינה" -> גבינה צהובה)
+      if (said && normKey(said) !== normKey(name)) cur.said = said;
       items.push(cur);
       pQty = null; pUnit = null; mode = 'normal'; conj = false; adjacent = true;
     };
@@ -174,7 +176,7 @@
         }
         if (mode === 'without' && cur && pQty == null) { cur.note += ' ' + m.raw; continue; }
         if (cur && !cur.known && adjacent === true && !conj && pQty == null) { cur.name += ' ' + m.raw; continue; }
-        start(m.name, true);
+        start(m.name, true, m.raw);
         continue;
       }
 
@@ -196,6 +198,7 @@
       it.note = it.note.trim();
       it.with = it.with.map(x => x.trim()).filter(Boolean);
       delete it.known;
+      if (it.said) it.said = it.said.trim();
     }
     return items.filter(it => it.name);
   }

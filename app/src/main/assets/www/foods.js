@@ -19,7 +19,7 @@ const CATEGORIES = {
 };
 
 const FOOD_LINES = `
-סלט ירקות|veg|סלט,סלט ישראלי,סלט קצוץ,סלט ירקות קצוץ
+סלט ירקות|veg|סלט,סלט ישראלי,סלט קצוץ,סלט ירקות קצוץ,ירקות,ירקות טריים
 מלפפון|veg|מלפפונים
 עגבנייה|veg|עגבניה,עגבניות,עגבניות שרי,שרי
 גזר|veg|גזרים
@@ -40,7 +40,7 @@ const FOOD_LINES = `
 סלק|veg|
 אבוקדו|veg|
 תרד|veg|
-ירקות מוקפצים|veg|ירקות מבושלים,ירקות בתנור,ירקות
+ירקות מוקפצים|veg|ירקות מבושלים,ירקות בתנור
 מרק ירקות|veg|מרק
 תפוח|fruit|תפוחים,תפוח עץ
 בננה|fruit|בננות
@@ -66,6 +66,7 @@ const FOOD_LINES = `
 פסטה מלאה|whole|
 בורגול|whole|
 לחם|grain|לחם לבן,לחם אחיד
+לחם קל|grain|לחם לייט,לחם דיאט
 חלה|grain|חלות
 פיתה|grain|פיתות
 לחמנייה|grain|לחמניה,לחמניות
@@ -79,17 +80,24 @@ const FOOD_LINES = `
 בורקס|grain|בורקסים
 קרואסון|grain|
 עוגייה|sweet|עוגיות,עוגיה
-ביצה|protein|ביצים,ביצה קשה,ביצים קשות
+ביצה|protein|ביצים
+ביצה קשה|protein|ביצים קשות,ביצה מבושלת,ביצים מבושלות
+ביצה רכה|protein|ביצים רכות
+ביצה מקושקשת|protein|ביצים מקושקשות,מקושקשת
 חביתה|protein|חביתות
 ביצת עין|protein|ביצה עין
 שקשוקה|protein|
-עוף|protein|חזה עוף,פרגית,פרגיות,שוקיים,כרעיים,כנפיים,עוף בתנור
+עוף|protein|שוקיים,כרעיים,כנפיים,עוף בתנור
+חזה עוף|protein|חזה,חזות עוף
+פרגית|protein|פרגיות
 שניצל|protein|שניצלים
 הודו|protein|חזה הודו,פסטרמה
 בשר|protein|בקר,בשר בקר,סטייק,בשר טחון
 קציצות|protein|קציצה,קבב
 דג|protein|דגים,אמנון,פילה דג,לברק,דניס,בורי
 טונה|protein|קופסת טונה
+טונה במים|protein|
+טונה בשמן|protein|
 סלמון|protein|
 נקניקיות|protein|נקניקייה,נקניק
 טופו|protein|
@@ -131,7 +139,8 @@ const FOOD_LINES = `
 ריבה|sweet|
 מים|drink|כוס מים,מים מינרליים,סודה
 תה|drink|תה ירוק,תה צמחים
-קפה|drink|הפוך,אספרסו,נס קפה,קפה שחור
+קפה|drink|אספרסו,נס קפה,קפה שחור
+הפוך|drink|קפוצ׳ינו,קפוצינו,לאטה
 מיץ|drink|מיץ תפוזים,מיץ טבעי
 משקה|drink|שתייה מתוקה,קולה,קוקה קולה
 סוכר|sweet|
@@ -192,6 +201,7 @@ whole wheat bread|whole|whole grain bread,wholemeal bread,whole wheat,multigrain
 whole wheat pita|whole|
 whole wheat pasta|whole|
 bread|grain|white bread
+light bread|grain|diet bread
 challah|grain|
 pita|grain|pitas,pita bread
 roll|grain|rolls,bun,buns
@@ -205,17 +215,24 @@ toast|grain|toasts
 croissant|grain|croissants
 bagel|grain|bagels
 cereal|grain|cornflakes,granola
-egg|protein|eggs,boiled egg,boiled eggs,hard boiled eggs
-omelette|protein|omelet,scrambled eggs
+egg|protein|eggs
+hard-boiled egg|protein|hard boiled egg,boiled egg,boiled eggs,hard boiled eggs,hard-boiled eggs
+soft-boiled egg|protein|soft boiled egg,soft-boiled eggs
+scrambled eggs|protein|scrambled egg
+omelette|protein|omelet
 fried egg|protein|fried eggs,sunny side up
 shakshuka|protein|
-chicken|protein|chicken breast,chicken thighs,chicken drumsticks,drumsticks,grilled chicken
+chicken|protein|chicken drumsticks,drumsticks,grilled chicken
+chicken breast|protein|chicken breasts
+chicken thigh|protein|chicken thighs
 schnitzel|protein|
 turkey|protein|turkey breast,pastrami
 beef|protein|steak,ground beef,meat
 meatballs|protein|meatball,kebab
 fish|protein|cod,tilapia,sea bass
 tuna|protein|tuna salad
+tuna in water|protein|
+tuna in oil|protein|
 salmon|protein|
 hot dogs|protein|hot dog,sausage,sausages
 tofu|protein|
@@ -254,7 +271,8 @@ honey|sauce|
 jam|sweet|
 water|drink|glass of water,sparkling water,soda water
 tea|drink|green tea,herbal tea
-coffee|drink|latte,cappuccino,espresso,black coffee
+coffee|drink|espresso,black coffee
+cappuccino|drink|latte,flat white
 juice|drink|orange juice
 soft drink|drink|cola,coke,soda
 sugar|sweet|
@@ -288,6 +306,7 @@ const PLURALS = {
   'חציל': 'חצילים', 'בטטה': 'בטטות', 'חלה': 'חלות', 'טוסט': 'טוסטים', 'בורקס': 'בורקסים',
   'קרואסון': 'קרואסונים', 'כריך': 'כריכים', 'המבורגר': 'המבורגרים', 'חטיף': 'חטיפים', 'וופל': 'וופלים',
   'פיתה מלאה': 'פיתות מלאות', 'תפוח אדמה': 'תפוחי אדמה', 'לימון': 'לימונים', 'אבוקדו': 'אבוקדו',
+  'ביצה קשה': 'ביצים קשות', 'ביצה רכה': 'ביצים רכות', 'ביצה מקושקשת': 'ביצים מקושקשות', 'ביצת עין': 'ביצי עין', 'חזה עוף': 'חזות עוף', 'פרגית': 'פרגיות',
 };
 // Construct forms of units before a noun: "2 משולשי עוף".
 const CONSTRUCT = { 'משולשים': 'משולשי', 'ספלים': 'ספלי', 'בקבוקים': 'בקבוקי', 'חופנים': 'חופני' };

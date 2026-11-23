@@ -241,7 +241,7 @@ function applyTags(raw, msg) {
       for (const date of tagDates(a)) {
         const items = P.parseItems(m[5] || '', lex());
         if (!items.length) break;
-        const added = addItemsToMeal(date, meal, items, true);
+        const added = addItemsToMeal(date, meal, items, true, true);
         actions.push({ type: 'log', date, meal, ids: added.map(x => x.id), text: added.map(x => P.formatItem(x)).join(', ') });
       }
     } else if (m[6] != null && aiSet().allowLog) {
