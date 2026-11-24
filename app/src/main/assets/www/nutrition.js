@@ -183,7 +183,7 @@ function openNutDay() { openSheet('nutday', nutDayHtml(), { full: true, title: t
 function nutDayHtml() {
   const day = getDay(S.date, false);
   let h = sheetHead(tr('פירוט תזונתי', 'Nutrition breakdown') + ` · ${shortDate(S.date)}`) + `<div class="body">
-    <p class="small muted" style="margin:0">${tr('הערכה לפי ערכים ממוצעים של מאכלים נפוצים וגודל מנה רגיל. לחיצה על מאכל מאפשרת לתקן את הערכים שלו, והתיקון חל על כל הימים.', 'Estimates from average values of common foods and usual portions. Tap a food to correct its values; the change applies to every day.')}</p>`;
+    <p class="small muted" style="margin:0">${tr('הערכה לפי ערכים ממוצעים של מאכלים נפוצים. מאכל בלי כמות נספר כאחד (פרוסת לחם, משולש פיצה), ובלשון רבים ("שקדים") כמנה רגילה. לחיצה על מאכל מאפשרת לתקן את הערכים שלו, והתיקון חל על כל הימים.', 'Estimates from average values of common foods. A food without an amount counts as one (a slice of bread, a slice of pizza), and a plural ("almonds") as a usual portion. Tap a food to correct its values; the change applies to every day.')}</p>`;
   if (isMoh() && hasFood(day)) h += mohHtml(dayN(day));
   for (const m of MEALS) {
     const items = day ? day.meals[m] : [];
@@ -226,7 +226,7 @@ function nutEditHtml() {
     <label class="field"><span>${gk === 'piece' ? tr('משקל יחידה אחת (גרם)', 'Weight of one piece (g)') : tr('משקל מנה (גרם)', 'Serving weight (g)')}</span><input class="gnum" type="number" inputmode="decimal" min="1" step="any" data-nut="g" value="${Math.round(g * 10) / 10}"></label>
     ${field('k', tr('קלוריות', 'Calories'))}
     <div class="row" style="gap:8px">${field('p', tr('חלבון (ג׳)', 'Protein (g)'))}${field('c', tr('פחמימות (ג׳)', 'Carbs (g)'))}${field('f', tr('שומן (ג׳)', 'Fat (g)'))}</div>
-    <p class="small muted" style="margin:0">${gk === 'piece' ? tr('על האריזה הערכים כתובים בדרך כלל ל-100 גרם. "יחידה" היא מה שנספר כשכותבים למשל "2 פרוסות" או "3 יחידות".', 'Labels usually list values per 100 g. A "piece" is what counts when you write e.g. "2 slices" or "3 pieces".') : tr('על האריזה הערכים כתובים בדרך כלל ל-100 גרם. "מנה" היא מה שנספר כשכותבים את המאכל בלי כמות, ויחידה אחת כשכותבים מספר ("2 חטיפים").', 'Labels usually list values per 100 g. A "serving" is what counts when you write the food without an amount, and one piece when you write a number ("2 bars").')}</p>
+    <p class="small muted" style="margin:0">${gk === 'piece' ? tr('על האריזה הערכים כתובים בדרך כלל ל-100 גרם. "יחידה" היא מה שנספר כשכותבים את המאכל בלי כמות, וכל אחת כשכותבים מספר ("2 פרוסות").', 'Labels usually list values per 100 g. A "piece" is what counts when you write the food without an amount, and each one when you write a number ("2 slices").') : tr('על האריזה הערכים כתובים בדרך כלל ל-100 גרם. "מנה" היא מה שנספר כשכותבים את המאכל בלי כמות, ויחידה אחת כשכותבים מספר ("2 חטיפים").', 'Labels usually list values per 100 g. A "serving" is what counts when you write the food without an amount, and one piece when you write a number ("2 bars").')}</p>
   </div>
   <footer>${db.nut && db.nut[r.name] ? `<button class="btn" data-act="nutReset">${icon('undo', 18)}${tr('ברירת מחדל', 'Default')}</button>` : ''}<button class="btn primary grow" data-act="nutSave">${tr('שמירה', 'Save')}</button></footer>`;
 }
@@ -261,7 +261,7 @@ function nutSettingsHtml() {
       ${!moh && n.target.f < 20 ? `<div class="small muted">${tr('לרוב ממליצים על 20%–35% מהקלוריות משומן.', 'Guidelines usually suggest 20–35% of calories from fat.')}</div>` : ''}
       <button class="btn" data-act="openFoods">${icon('list', 18)}${tr('תיקון ערכים של מאכלים', 'Correct food values')}</button>
       ${choicesHtml()}
-      <p class="small muted" style="margin:0">${tr('המספרים הם הערכה לפי ערכים ממוצעים וגודל מנה רגיל, לא שקילה. מאכל שכתבת עם "גרם" נספר לפי המשקל שכתבת.', 'The numbers are estimates from average values and usual portions, not weighing. Foods written in grams count by the weight you wrote.')}</p>
+      <p class="small muted" style="margin:0">${tr('המספרים הם הערכה לפי ערכים ממוצעים, לא שקילה. מאכל בלי כמות נספר כאחד, ומאכל שכתבת עם "גרם" נספר לפי המשקל שכתבת.', 'The numbers are estimates from average values, not weighing. A food without an amount counts as one, and foods written in grams count by the weight you wrote.')}</p>
     </div>
   </section>`;
 }

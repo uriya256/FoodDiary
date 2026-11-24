@@ -182,7 +182,7 @@ LOGGING from the chat is turned OFF in the app settings, so you cannot change th
 Tags are hidden from the user and handled by the app; mention briefly in words what you saved or logged.
 IMPORTANT: the diary changes ONLY through tags. Never say that you logged, added, updated, changed or deleted something unless the matching tags are in this same reply. If you cannot do something with the tags below, say so honestly.
 
-NUTRITION: the "Nutrition estimate" lines are the app's rough estimates from average food values and usual portions, not measurements; say so when it matters. ${nutSet().goal ? `Daily calorie goal: ${nutSet().goal} kcal (weekly ${weekGoal()}).` : 'No calorie goal set.'} ${nutTargetAi()}
+NUTRITION: the "Nutrition estimate" lines are the app's rough estimates from average food values and usual portions, not measurements; say so when it matters. A food written without a number counts as ONE piece (one slice of bread, one slice of pizza, one egg); a plural without a number ("שקדים") counts as a usual portion. So when you log, write the number the user said, and write none when they gave none. ${nutSet().goal ? `Daily calorie goal: ${nutSet().goal} kcal (weekly ${weekGoal()}).` : 'No calorie goal set.'} ${nutTargetAi()}
 
 WEIGHT LOG (kg):
 ${weightContext()}

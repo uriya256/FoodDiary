@@ -227,8 +227,24 @@ function nutFor(name, cat, user) {
 /** Which weight the value editor shows: one piece when the food is counted in pieces, else a serving. */
 function editWeightKey(n) { return n && n.piece !== n.serving && n.piece >= 15 ? 'piece' : 'serving'; }
 
-/** Grams of one diary amount. attached = written after "עם". */
-function gramsOf(n, qty, unit, attached, cat) {
+// Bare names that mean a portion, not a single piece ("סושי" is a plate of sushi, not one roll).
+const PORTION_NAMES = new Set(['סושי', 'פלאפל', 'חסה', 'פירות יבשים', 'sushi', 'falafel', 'lettuce', 'dried fruit']);
+/** Whether the words name more than one ("שקדים", "אגוזי מלך", "almonds"); then no number means a usual portion. */
+function looksPlural(w) {
+  const s = String(w || '').trim();
+  if (!s) return false;
+  const words = s.split(/\s+/);
+  if (/^[a-z\s'-]+$/i.test(s)) { const l = words[words.length - 1]; return /s$/i.test(l) && !/(ss|us|is)$/i.test(l); }
+  return words.some(x => /(ים|ות)$/.test(x)) || (words.length > 1 && /[^ו]י$/.test(words[0]));
+}
+/** A food written without a number means one ("פיצה" = a slice, "פרגית" = one thigh), unless the words are plural or the food is eaten by the portion. */
+function meansOne(item, name) {
+  if (PORTION_NAMES.has(name)) return false;
+  return !looksPlural(item.said || item.name);
+}
+
+/** Grams of one diary amount. attached = written after "עם"; one = written without a number and meaning a single piece. */
+function gramsOf(n, qty, unit, attached, cat, one) {
   if (unit === 'גרם') return qty == null ? 100 : qty;
   if (unit) {
     let g = n.u && n.u[unit];
@@ -239,7 +255,7 @@ function gramsOf(n, qty, unit, attached, cat) {
     }
     return (qty == null ? 1 : qty) * g;
   }
-  if (qty == null) return attached ? (n.add || n.serving) : n.serving;
+  if (qty == null) return attached ? (n.add || n.serving) : (one && n.piece ? n.piece : n.serving);
   return qty * (n.piece || n.serving);
 }
 
@@ -257,7 +273,7 @@ function itemNut(item, resolve, user) {
   const t = zero();
   const main = resolve(item.name);
   const n = main && nutFor(main.name, main.cat, user);
-  if (n) addTo(t, n, gramsOf(n, item.qty, item.unit, false, main.cat), main.guess ? 'guess' : n.src);
+  if (n) addTo(t, n, gramsOf(n, item.qty, item.unit, false, main.cat, meansOne(item, main.name)), main.guess ? 'guess' : n.src);
   else t.unknown++;
   for (const w of item.with || []) {
     const r = resolve(w);
@@ -325,7 +341,7 @@ function gramRange(kcal, R) {
   return o;
 }
 
-const NUT_API = { NUT, NUT_EN, CAT_NUT, UNIT_G, MOH, nutFor, editWeightKey, gramsOf, itemNut, sumNut, macroPct, balance, balanceRange, gramRange };
+const NUT_API = { NUT, NUT_EN, CAT_NUT, UNIT_G, MOH, nutFor, editWeightKey, gramsOf, looksPlural, meansOne, itemNut, sumNut, macroPct, balance, balanceRange, gramRange };
 if (typeof module !== 'undefined') module.exports = NUT_API;
 if (typeof window !== 'undefined') window.Nutri = NUT_API;
 })();
