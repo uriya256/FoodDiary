@@ -4,7 +4,7 @@
    Loaded before app.js; runs only when app.js calls it. */
 
 const AI_BASE = 'https://generativelanguage.googleapis.com/v1beta/';
-const AI = { busy: false, reqId: null, streamText: '', model: null, triedFallback: false, onDone: null };
+const AI = { busy: false, reqId: null, streamText: '', model: null, onDone: null, slowMs: 35000 /* no words after this long: switch to the faster model */ };
 
 /* Several conversations ("pages"). db.ai.chats holds them; aiDb().messages is the open one. */
 const AI_MAX_CHATS = 40;
@@ -81,7 +81,8 @@ function aiStream(model, body, handlers) {
   const key = aiSet().key;
   if (A && A.aiStream) { A.aiStream(id, model, key, JSON.stringify(body)); return id; }
   // browser fallback (used while developing)
-  fetch(`${AI_BASE}models/${model}:streamGenerateContent?alt=sse`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) })
+  const ctl = new AbortController(); aiCtl[id] = ctl;
+  fetch(`${AI_BASE}models/${model}:streamGenerateContent?alt=sse`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: ctl.signal })
     .then(async (r) => {
       if (!r.ok) { window.onAiError(id, r.status, await r.text()); return; }
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
@@ -91,8 +92,17 @@ function aiStream(model, body, handlers) {
         let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (line.startsWith('data:')) window.onAiChunk(id, line.slice(5).trim()); }
       }
       window.onAiDone(id);
-    }).catch(e => window.onAiError(id, 0, String(e)));
+    }).catch(e => window.onAiError(id, navigator.onLine === false ? 0 : -1, String(e)))
+    .finally(() => { delete aiCtl[id]; });
   return id;
+}
+const aiCtl = {};
+/** Stops a request without telling its handlers. */
+function aiCancelReq(id) {
+  if (!id) return;
+  delete aiPending[id];
+  if (A && A.aiCancel) A.aiCancel(id);
+  if (aiCtl[id]) { try { aiCtl[id].abort(); } catch (e) { } delete aiCtl[id]; }
 }
 window.onAiChunk = (id, json) => {
   const h = aiPending[id]; if (!h) return;
@@ -149,7 +159,7 @@ function aiSystemPrompt() {
   const lang = LANG === 'en' ? 'English' : 'Hebrew';
   return `You are a warm, practical companion inside the user's food-diary app ("${tr('יומן אוכל', 'Food Diary')}"). You talk with the user about what they ate, their habits, water, their gym workouts, and ideas for meals, using their real diary below. Diary lines that start with "אימון"/"Workout" are gym sessions: "3x10 60 ק״ג" means 3 sets of 10 reps with 60 kg; "12/10/8x40/45/50" lists each set's reps and kg.
 
-Today is ${P.weekdayName(iso)} ${P.displayDate(iso)}, time ${pad(now.getHours())}:${pad(now.getMinutes())}. Reply in ${lang} unless the user writes in another language. Keep answers short and friendly (usually 2–6 sentences or a short list). Use the diary to give concrete, personal answers (dates, foods, amounts). Do not invent diary entries.
+Reply in ${lang} unless the user writes in another language. Keep answers short and friendly (usually 2–6 sentences or a short list). Use the diary to give concrete, personal answers (dates, foods, amounts). Do not invent diary entries.
 
 You are not a doctor or dietitian. For medical conditions, medications, pregnancy, allergies or strong symptoms, give general information only and suggest talking to a doctor or registered dietitian. Never encourage extreme restriction, skipping meals, or very low calorie intake. If the user seems distressed about food or body, be gentle and suggest professional support.
 
@@ -172,15 +182,17 @@ LOGGING from the chat is turned OFF in the app settings, so you cannot change th
 Tags are hidden from the user and handled by the app; mention briefly in words what you saved or logged.
 IMPORTANT: the diary changes ONLY through tags. Never say that you logged, added, updated, changed or deleted something unless the matching tags are in this same reply. If you cannot do something with the tags below, say so honestly.
 
-NUTRITION: the "Nutrition estimate" lines are the app's rough estimates from average food values and usual portions, not measurements; say so when it matters. ${nutSet().goal ? `Daily calorie goal: ${nutSet().goal} kcal (weekly ${weekGoal()}).` : 'No calorie goal set.'} ${nutTargetAi()} Today so far: ${hasFood(db.days[iso]) ? nutLine(db.days[iso]) : 'nothing logged'}.
+NUTRITION: the "Nutrition estimate" lines are the app's rough estimates from average food values and usual portions, not measurements; say so when it matters. ${nutSet().goal ? `Daily calorie goal: ${nutSet().goal} kcal (weekly ${weekGoal()}).` : 'No calorie goal set.'} ${nutTargetAi()}
 
 WEIGHT LOG (kg):
 ${weightContext()}
 
-WATER: daily goal ${w.goalMl} ml; today so far ${dayWaterMl(db.days[iso])} ml; main bottle ${mainBottle().ml} ml; glass ${w.cupMl} ml.
+WATER: daily goal ${w.goalMl} ml; main bottle ${mainBottle().ml} ml; glass ${w.cupMl} ml.
 
 THE DIARY (newest last):
-${aiDiaryContext()}`;
+${aiDiaryContext()}
+
+NOW: today is ${P.weekdayName(iso)} ${P.displayDate(iso)} (${iso}), time ${pad(now.getHours())}:${pad(now.getMinutes())}. Eaten today so far: ${hasFood(db.days[iso]) ? nutLine(db.days[iso]) : 'nothing logged'}. Water today: ${dayWaterMl(db.days[iso])} ml.`;
 }
 function aiContents() {
   const msgs = aiDb().messages.filter(m => m.text && !m.error).slice(-80);
@@ -361,8 +373,8 @@ function groupCard(m, from, to) {
 function bubble(m) {
   const mine = m.role === 'user';
   const body = mine ? `<p>${esc(m.text).replace(/\n/g, '<br>')}</p>` : mdLite(m.text);
-  const warn = !mine && !m.error && (m.noop || m.cut) ? `<div class="aact warn">${icon('info', 16)}<span class="grow">${m.cut ? tr('התשובה נקטעה באמצע, ויכול להיות שלא הכל נרשם.', 'The answer was cut off, so not everything may have been logged.') : tr('שים לב: בתשובה הזאת לא השתנה שום דבר ביומן.', 'Note: nothing in the diary changed in this answer.')}</span>${AI.busy ? '' : `<button class="linkbtn" data-act="aiRedo" data-cut="${m.cut ? 1 : ''}">${tr('בקש לבצע', 'Ask to do it')}</button>`}</div>` : '';
-  return `<div class="msg ${mine ? 'me' : 'bot'} ${m.error ? 'err' : ''}" data-mid="${m.id}"><div class="bub">${body || '<span class="typing"><i></i><i></i><i></i></span>'}</div>${actionCards(m)}${warn}${m.error ? `<button class="linkbtn" data-act="aiRetry">${icon('undo', 14)} ${tr('נסה שוב', 'Try again')}</button>` : ''}</div>`;
+  const warn = !mine && !m.error && (m.noop || m.cut) ? `<div class="aact warn">${icon('info', 16)}<span class="grow">${m.cut ? (m.dropped ? tr('החיבור נקטע באמצע התשובה, ויכול להיות שלא הכל נרשם.', 'The connection dropped in the middle of the answer, so not everything may have been logged.') : tr('התשובה נקטעה באמצע, ויכול להיות שלא הכל נרשם.', 'The answer was cut off, so not everything may have been logged.')) : tr('שים לב: בתשובה הזאת לא השתנה שום דבר ביומן.', 'Note: nothing in the diary changed in this answer.')}</span>${AI.busy ? '' : `<button class="linkbtn" data-act="aiRedo" data-cut="${m.cut ? 1 : ''}">${m.cut ? tr('בקש להמשיך', 'Ask to continue') : tr('בקש לבצע', 'Ask to do it')}</button>`}</div>` : '';
+  return `<div class="msg ${mine ? 'me' : 'bot'} ${m.error ? 'err' : ''}" data-mid="${m.id}"><div class="bub">${body || waitingHtml(m)}</div>${actionCards(m)}${warn}${m.error ? `<button class="linkbtn" data-act="aiRetry">${icon('undo', 14)} ${tr('נסה שוב', 'Try again')}</button>` : ''}</div>`;
 }
 function viewChat() {
   const s = aiSet();
@@ -405,11 +417,12 @@ function chatScrollBottom(force) {
   if (!sc) return;
   if (force || sc.scrollHeight - sc.scrollTop - sc.clientHeight < 160) sc.scrollTop = sc.scrollHeight;
 }
+function waitingHtml(m) { return `<span class="typing"><i></i><i></i><i></i></span>${m.status ? `<span class="aistat">${esc(m.status)}</span>` : ''}`; }
 function updateStreamingBubble(msg) {
   const el = document.querySelector(`.msg[data-mid="${msg.id}"] .bub`);
   if (!el) return;
   const shown = stripTags(msg.raw || '');
-  el.innerHTML = shown ? mdLite(shown) : '<span class="typing"><i></i><i></i><i></i></span>';
+  el.innerHTML = shown ? mdLite(shown) : waitingHtml(msg);
   chatScrollBottom(false);
 }
 
@@ -422,44 +435,128 @@ function aiSend(text) {
   AI.draft = '';
   aiRun();
 }
+/**
+ * How much the model thinks before it answers. Less thinking answers much faster, and a food chat rarely needs more.
+ * Each model has a first choice and a second one, used (and remembered) if Google refuses the first.
+ */
+function thinkCfgs(model) {
+  if (/^gemini-2\.5/.test(model)) return [{ thinkingBudget: 0 }, null];
+  if (/lite/.test(model)) return [null, { thinkingLevel: 'low' }];
+  return [{ thinkingLevel: 'low' }, null];
+}
+function aiGenCfg(model, ti) {
+  const g = { maxOutputTokens: 8192 };
+  if (/^gemini-[12]\./.test(model)) g.temperature = 0.7; // Gemini 3 and later work best at their own default
+  const tc = thinkCfgs(model)[ti];
+  if (tc) g.thinkingConfig = tc;
+  return g;
+}
+function aiErrText(code, detail) {
+  if (detail === 'empty') return tr('לא התקבלה תשובה. נסה שוב.', 'No answer came back. Try again.');
+  if (code === 429) return tr('הגעת למגבלת השימוש החינמית לרגע. נסה שוב בעוד דקה.', 'You hit the free usage limit for now. Try again in a minute.');
+  if (code === 401 || code === 403 || (code === 400 && /API_KEY|api key|PERMISSION|UNAUTHENTICATED|ACCESS_TOKEN/i.test(detail || ''))) return tr('המפתח לא תקין. אפשר להחליף אותו בהגדרות › צ׳אט AI.', 'The key is not valid. You can replace it in Settings › AI chat.');
+  if (code === 0) return tr('אין חיבור לאינטרנט. נסה שוב כשיש רשת.', 'No internet connection. Try again when you are online.');
+  if (code === -2 || code === -3) return tr('Google לא ענה בזמן. נסה שוב.', 'Google took too long to answer. Try again.');
+  if (code === -1) return tr('החיבור ל-Google נקטע. נסה שוב.', 'The connection to Google dropped. Try again.');
+  if (code >= 500) return tr('השרתים של Google עמוסים כרגע. נסה שוב בעוד רגע.', "Google's servers are busy right now. Try again in a moment.");
+  return tr(`משהו השתבש (${code}). נסה שוב.`, `Something went wrong (${code}). Try again.`);
+}
 function aiRun() {
   const ai = aiDb();
   const s = aiSet();
+  if (!s.think) s.think = {};
   const bot = { id: 'a' + uid(), role: 'model', text: '', raw: '', t: new Date().toISOString() };
   ai.messages.push(bot);
-  AI.busy = true; AI.triedFallback = false;
+  AI.busy = true;
   save();
   render(); chatScrollBottom(true);
-  const body = {
+  const base = {
     systemInstruction: { parts: [{ text: aiSystemPrompt() }] },
     contents: aiContents().filter(c => c.parts[0].text),
-    generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
   };
-  const go = (model) => aiStream(model, body, {
-    chunk(t) { bot.raw += t; bot.text = stripTags(bot.raw); updateStreamingBubble(bot); },
+  // one answer can take a few requests: again after a dropped connection, with the other thinking setting, or with the faster model
+  const run = { model: s.model || 'gemini-flash-latest', tries: 0, fellBack: false, thinkSwitched: false, got: false, over: false, id: null, ti: 0, timers: [] };
+  AI.run = run;
+  const clear = () => { run.timers.forEach(clearTimeout); run.timers = []; };
+  const later = (fn, ms) => run.timers.push(setTimeout(fn, ms));
+  const status = (t) => { bot.status = t; updateStreamingBubble(bot); };
+  const canFallBack = () => s.fallback && !run.fellBack && run.model !== s.fallback;
+  const end = () => {
+    run.over = true; clear(); AI.busy = false; AI.run = null; delete bot.status;
+    save(); if (S.tab === 'chat') { render({ keepScroll: true }); chatScrollBottom(true); }
+  };
+  const finish = () => {
+    if (run.over) return;
+    if (!bot.raw.trim()) { bot.error = true; bot.text = run.stopped ? tr('עצרת את התשובה.', 'You stopped the answer.') : aiErrText(0, 'empty'); }
+    else {
+      applyTags(bot.raw, bot); bot.text = stripTags(bot.raw);
+      // the reply says it changed the diary, but no change came with it
+      if (!bot.actions.length && s.allowLog && /(רשמתי|עדכנתי|הוספתי|שיניתי|מחקתי|תיקנתי|החלפתי|\bI(?:'ve| have)? (?:logged|updated|added|changed|deleted|replaced)\b)/i.test(bot.text)) bot.noop = true;
+    }
+    end();
+  };
+  const fail = (code, detail) => { if (run.over) return; bot.error = true; bot.text = aiErrText(code, detail); end(); };
+  // after the app was in the background the phone may have paused the network: wait until it is back on screen
+  const whenVisible = (fn, ms) => {
+    if (!document.hidden) { later(fn, ms); return; }
+    const v = () => { if (document.hidden) return; document.removeEventListener('visibilitychange', v); if (!run.over) later(fn, 500); };
+    document.addEventListener('visibilitychange', v);
+  };
+  const retry = (code, detail) => {
+    clear();
+    const transient = code <= 0 || code === 408 || code >= 500 || detail === 'empty';
+    // no internet: one more try in case the phone was just switching networks; another model won't help
+    if (code === 0) {
+      if (run.tries < 1) { run.tries++; status(tr('אין רשת כרגע, מנסה שוב…', 'No network right now, trying again…')); whenVisible(start, 3000); return; }
+      fail(code, detail); return;
+    }
+    if (transient && code !== -3 && run.tries < 2) {
+      run.tries++;
+      status(code >= 500 ? tr('השרתים של Google עמוסים, מנסה שוב…', "Google's servers are busy, trying again…") : tr('החיבור ל-Google נקטע, מנסה שוב…', 'The connection to Google dropped, trying again…'));
+      whenVisible(start, 1200 * run.tries);
+      return;
+    }
+    if ((transient || code === 429 || code === 404) && canFallBack()) {
+      run.fellBack = true; run.model = s.fallback; run.tries = 0;
+      status(code === -3 ? tr('לוקח לו הרבה זמן, עובר למודל מהיר יותר…', 'This is taking long, switching to a faster model…') : tr('מנסה עם מודל אחר…', 'Trying another model…'));
+      whenVisible(start, 300);
+      return;
+    }
+    fail(code, detail);
+  };
+  const handlers = {
+    chunk(t) {
+      if (run.over) return;
+      if (!run.got) { run.got = true; clear(); delete bot.status; }
+      bot.raw += t; bot.text = stripTags(bot.raw); updateStreamingBubble(bot);
+    },
     blocked() { bot.raw = bot.raw || tr('לא יכולתי לענות על זה.', "I couldn't answer that."); },
     truncated() { bot.cut = true; },
     done() {
-      AI.busy = false;
-      if (!bot.raw.trim()) { bot.error = true; bot.text = tr('לא התקבלה תשובה. נסה שוב.', 'No answer came back. Try again.'); }
-      else {
-        applyTags(bot.raw, bot); bot.text = stripTags(bot.raw);
-        // the reply says it changed the diary, but no change came with it
-        if (!bot.actions.length && s.allowLog && /(רשמתי|עדכנתי|הוספתי|שיניתי|מחקתי|תיקנתי|החלפתי|\bI(?:'ve| have)? (?:logged|updated|added|changed|deleted|replaced)\b)/i.test(bot.text)) bot.noop = true;
-      }
-      save(); if (S.tab === 'chat') { render({ keepScroll: true }); chatScrollBottom(true); }
+      if (run.over) return;
+      if (!bot.raw.trim() && !run.stopped) { retry(-1, 'empty'); return; }
+      finish();
     },
     error(code, detail) {
-      if ((code === 429 || code === 404 || code === 503) && !AI.triedFallback && s.fallback && model !== s.fallback) { AI.triedFallback = true; bot.raw = ''; go(s.fallback); return; }
-      AI.busy = false; bot.error = true;
-      bot.text = code === 429 ? tr('הגעת למגבלת השימוש החינמית לרגע. נסה שוב בעוד דקה.', 'You hit the free usage limit for now. Try again in a minute.')
-        : (code === 401 || code === 403 || (code === 400 && /API_KEY|api key|PERMISSION|UNAUTHENTICATED|ACCESS_TOKEN/i.test(detail || ''))) ? tr('המפתח לא תקין. אפשר להחליף אותו בהגדרות › צ׳אט AI.', 'The key is not valid. You can replace it in Settings › AI chat.')
-        : code === 0 ? tr('אין חיבור לאינטרנט. נסה שוב כשיש רשת.', 'No internet connection. Try again when you are online.')
-        : tr(`משהו השתבש (${code}). נסה שוב.`, `Something went wrong (${code}). Try again.`);
-      save(); if (S.tab === 'chat') { render({ keepScroll: true }); chatScrollBottom(true); }
+      if (run.over) return;
+      // the answer stopped in the middle: keep what came
+      if (run.got) { bot.cut = true; bot.dropped = true; finish(); return; }
+      // this model doesn't take that thinking setting: use the other one from now on
+      if (code === 400 && !run.thinkSwitched && /think|thought|signature|budget/i.test(detail || '')) {
+        run.thinkSwitched = true; s.think[run.model] = run.ti ? 0 : 1; save(); start(); return;
+      }
+      retry(code, detail);
     },
-  });
-  go(s.model || 'gemini-flash-latest');
+  };
+  function start() {
+    if (run.over) return;
+    run.ti = s.think[run.model] ? 1 : 0;
+    run.id = aiStream(run.model, Object.assign({ generationConfig: aiGenCfg(run.model, run.ti) }, base), handlers);
+    later(() => { if (!run.got && !run.over) status(tr('חושב…', 'Thinking…')); }, 8000);
+    if (canFallBack()) later(() => { if (!run.got && !run.over) { aiCancelReq(run.id); retry(-3, 'slow'); } }, AI.slowMs);
+  }
+  run.stop = () => { if (run.over) return; run.stopped = true; aiCancelReq(run.id); finish(); };
+  start();
 }
 
 /* ---------- conversations sheet ---------- */
@@ -533,7 +630,7 @@ const AI_ACT = {
     confirmSheet(tr('ניתוק הצ׳אט', 'Disconnect chat'), tr('המפתח יימחק מהטלפון. השיחות והזיכרון יישארו.', 'The key will be removed from the phone. Chats and memory stay.'), tr('ניתוק', 'Disconnect'), () => { const s = aiSet(); s.key = ''; s.model = ''; s.fallback = ''; save(); render({ keepScroll: true }); });
   },
   aiSuggest(el) { aiSend(el.dataset.t); },
-  aiStop() { if (A && A.aiCancel && AI.reqId) A.aiCancel(AI.reqId); const h = aiPending[AI.reqId]; if (h) { delete aiPending[AI.reqId]; h.done(); } },
+  aiStop() { if (AI.run) AI.run.stop(); else AI.busy = false; },
   aiRetry() {
     const ai = aiDb();
     while (ai.messages.length && ai.messages[ai.messages.length - 1].role !== 'user') ai.messages.pop();

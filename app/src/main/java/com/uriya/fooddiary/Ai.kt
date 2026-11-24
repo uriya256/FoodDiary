@@ -1,7 +1,10 @@
 package com.uriya.fooddiary
 
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 
@@ -16,6 +19,20 @@ object Ai {
 
     private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
 
+    /** Whether the phone has a network that reaches the internet right now. */
+    private fun online(act: MainActivity): Boolean = try {
+        val cm = act.getSystemService(ConnectivityManager::class.java)
+        val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+        caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    } catch (_: Exception) { true }
+
+    /** Error codes for failures without an HTTP answer: 0 no internet, -1 the connection dropped, -2 Google didn't answer in time. */
+    private fun failCode(act: MainActivity, e: Exception) = when {
+        e is SocketTimeoutException -> -2
+        !online(act) -> 0
+        else -> -1
+    }
+
     fun stream(act: MainActivity, id: String, model: String, key: String, body: String) {
         if (!SAFE_MODEL.matches(model)) { act.js("window.onAiError && window.onAiError(${q(id)}, 404, 'bad model')"); return }
         Thread {
@@ -28,7 +45,7 @@ object Ai {
                         requestMethod = "POST"
                         doOutput = true
                         connectTimeout = 20000
-                        readTimeout = 120000
+                        readTimeout = 90000
                         setRequestProperty("Content-Type", "application/json; charset=utf-8")
                         if (!viaQuery) setRequestProperty("x-goog-api-key", key)
                     }
@@ -51,7 +68,7 @@ object Ai {
                     break
                 }
             } catch (e: Exception) {
-                if (running.containsKey(id)) act.js("window.onAiError && window.onAiError(${q(id)}, 0, ${q(e.toString())})")
+                if (running.containsKey(id)) act.js("window.onAiError && window.onAiError(${q(id)}, ${failCode(act, e)}, ${q(e.toString())})")
             } finally {
                 running.remove(id)
                 conn?.disconnect()
@@ -83,7 +100,7 @@ object Ai {
                 }
                 act.js("window.onAiHttp && window.onAiHttp(${q(id)}, $code, ${q(text)})")
             } catch (e: Exception) {
-                act.js("window.onAiHttp && window.onAiHttp(${q(id)}, 0, ${q(e.toString())})")
+                act.js("window.onAiHttp && window.onAiHttp(${q(id)}, ${failCode(act, e)}, ${q(e.toString())})")
             }
         }.start()
     }

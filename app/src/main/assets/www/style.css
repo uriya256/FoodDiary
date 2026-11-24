@@ -616,3 +616,4 @@ html.dark .mk.ok { color: #7DDBA6; } html.dark .mk.lo, html.dark .mk.hi { color:
 .mohtbl tbody th i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 5px; }
 .mohtbl tbody tr:last-child th, .mohtbl tbody tr:last-child td { border-bottom: 0; }
 .nw { white-space: nowrap; }
+.aistat { display: block; font-size: 12.5px; color: var(--muted); margin-top: 4px; }

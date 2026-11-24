@@ -9,6 +9,16 @@ enum Gemini {
         s.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? s
     }
 
+    /// Error codes for failures without an HTTP answer: 0 no internet, -1 the connection dropped, -2 Google didn't answer in time.
+    private static func failCode(_ error: Error) -> Int {
+        guard let e = error as? URLError else { return -1 }
+        switch e.code {
+        case .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff: return 0
+        case .timedOut: return -2
+        default: return -1
+        }
+    }
+
     static func stream(id: String, model: String, key: String, body: String, js: @escaping (String) -> Void) {
         guard model.range(of: "^[A-Za-z0-9._-]{3,80}$", options: .regularExpression) != nil else {
             js("window.onAiError && window.onAiError(\(jsq(id)), 404, 'bad model')"); return
@@ -20,7 +30,7 @@ enum Gemini {
                 var s = base + "models/\(model):streamGenerateContent?alt=sse"
                 if viaQuery { s += "&key=" + enc(key) }
                 guard let url = URL(string: s) else { break }
-                var req = URLRequest(url: url, timeoutInterval: 120)
+                var req = URLRequest(url: url, timeoutInterval: 90)
                 req.httpMethod = "POST"
                 req.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
                 if !viaQuery { req.setValue(key, forHTTPHeaderField: "x-goog-api-key") }
@@ -45,7 +55,7 @@ enum Gemini {
                     if !Task.isCancelled { js("window.onAiDone && window.onAiDone(\(jsq(id)))") }
                     break
                 } catch {
-                    if !Task.isCancelled { js("window.onAiError && window.onAiError(\(jsq(id)), 0, \(jsq(error.localizedDescription)))") }
+                    if !Task.isCancelled { js("window.onAiError && window.onAiError(\(jsq(id)), \(failCode(error)), \(jsq(error.localizedDescription)))") }
                     break
                 }
             }
@@ -72,7 +82,7 @@ enum Gemini {
                     code = (resp as? HTTPURLResponse)?.statusCode ?? 0
                     text = String(decoding: data, as: UTF8.self)
                 } catch {
-                    code = 0
+                    code = failCode(error)
                     text = error.localizedDescription
                 }
                 if viaQuery || (code != 401 && code != 403) { break }
