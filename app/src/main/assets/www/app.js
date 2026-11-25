@@ -165,6 +165,12 @@ function hydrateDb(d) {
   out.settings.gym = Object.assign({ rest: 90 }, ds.gym || {});
   out.nut = out.nut && typeof out.nut === 'object' ? out.nut : {};
   out.weights = Array.isArray(out.weights) ? out.weights.filter(x => x && x.date && x.kg > 0) : [];
+  // cottage cheese used to count as white cheese: entries written as "קוטג׳" are cottage again
+  for (const iso in out.days) {
+    const d = out.days[iso];
+    if (!d || !d.meals) continue;
+    for (const m in d.meals) for (const it of d.meals[m] || []) if (it && it.name === 'גבינה לבנה' && /קוטג/.test(it.said || '')) { it.name = 'קוטג׳'; delete it.said; }
+  }
   const prev = db;
   db = out;
   try { migrateWater(); } finally { db = prev; }

@@ -33,7 +33,8 @@ const AMBIG = {
     q: ['איזו גבינה?', 'Which cheese?'],
     opts: [
       { he: 'גבינה צהובה', en: 'cheese', label: ['צהובה', 'Yellow'] },
-      { he: 'גבינה לבנה', en: 'cottage cheese', label: ['לבנה / קוטג׳', 'White / cottage'] },
+      { he: 'גבינה לבנה', en: 'white cheese', label: ['לבנה', 'White'] },
+      { he: 'קוטג׳', en: 'cottage cheese', label: ['קוטג׳', 'Cottage'] },
       { he: 'גבינה בולגרית', en: 'feta', label: ['בולגרית / פטה', 'Feta'] },
     ],
   },

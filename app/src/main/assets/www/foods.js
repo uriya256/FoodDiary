@@ -109,7 +109,8 @@ const FOOD_LINES = `
 פלאפל|legume|כדורי פלאפל
 אדממה|legume|
 יוגורט|dairy|יוגורטים,יוגורט יווני,מעדן חלבון
-גבינה לבנה|dairy|לבנה,קוטג׳,קוטג',קוטג
+גבינה לבנה|dairy|לבנה
+קוטג׳|dairy|קוטג',קוטג,גבינת קוטג׳,גבינת קוטג'
 גבינה צהובה|dairy|גבינה
 גבינה בולגרית|dairy|בולגרית,פטה,צפתית
 חלב|dairy|
@@ -244,7 +245,8 @@ chickpeas|legume|garbanzo
 falafel|legume|
 edamame|legume|
 yogurt|dairy|greek yogurt,yoghurt
-cottage cheese|dairy|cream cheese,white cheese,labneh
+cottage cheese|dairy|cottage
+white cheese|dairy|cream cheese,labneh
 cheese|dairy|yellow cheese,cheddar,mozzarella
 feta|dairy|feta cheese
 milk|dairy|
