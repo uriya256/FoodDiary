@@ -265,6 +265,12 @@ function addTo(t, n, grams, src) {
   t.k += n.k * r; t.p += n.p * r; t.c += n.c * r; t.f += n.f * r; t.g += grams;
   if (src === 'cat' || src === 'guess') t.guess++;
 }
+/** Values of a supermarket product, on top of what the food already had (its units, its usual add-on amount). */
+function prodNut(p, base) {
+  const o = Object.assign({ serving: 100, piece: 100, add: 30, u: {} }, base || {}, { k: +p.k || 0, p: +p.p || 0, c: +p.c || 0, f: +p.f || 0, src: 'user' });
+  if (p.g > 0) o.piece = p.g;
+  return o;
+}
 /**
  * Calories and macros of one diary item, including what was written after "עם".
  * resolve(name) -> {name, cat} finds a known food for free text ("לימון סחוט" -> לימון).
@@ -272,8 +278,10 @@ function addTo(t, n, grams, src) {
 function itemNut(item, resolve, user) {
   const t = zero();
   const main = resolve(item.name);
-  const n = main && nutFor(main.name, main.cat, user);
-  if (n) addTo(t, n, gramsOf(n, item.qty, item.unit, false, main.cat, meansOne(item, main.name)), main.guess ? 'guess' : n.src);
+  let n = main && nutFor(main.name, main.cat, user);
+  // a supermarket product chosen for this item only: its label values, and its unit for "one"
+  if (item.prod) n = prodNut(item.prod, n);
+  if (n) addTo(t, n, gramsOf(n, item.qty, item.unit, false, main && main.cat, main ? meansOne(item, main.name) : true), main && main.guess && !item.prod ? 'guess' : n.src);
   else t.unknown++;
   for (const w of item.with || []) {
     const r = resolve(w);
@@ -341,7 +349,7 @@ function gramRange(kcal, R) {
   return o;
 }
 
-const NUT_API = { NUT, NUT_EN, CAT_NUT, UNIT_G, MOH, nutFor, editWeightKey, gramsOf, looksPlural, meansOne, itemNut, sumNut, macroPct, balance, balanceRange, gramRange };
+const NUT_API = { NUT, NUT_EN, CAT_NUT, UNIT_G, MOH, nutFor, prodNut, editWeightKey, gramsOf, looksPlural, meansOne, itemNut, sumNut, macroPct, balance, balanceRange, gramRange };
 if (typeof module !== 'undefined') module.exports = NUT_API;
 if (typeof window !== 'undefined') window.Nutri = NUT_API;
 })();

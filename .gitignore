@@ -11,3 +11,6 @@ ios/Payload/
 ios/*.xcodeproj/
 ios/FoodDiary/Info.plist
 ios/build.log
+
+# made by the build from Open Food Facts (tools/fetch_products.py)
+app/src/main/assets/www/products.js

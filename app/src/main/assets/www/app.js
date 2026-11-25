@@ -89,6 +89,7 @@ const IC = {
   dumbbell: '<rect class="d" x="4.5" y="6.5" width="3.2" height="11" rx="1.3"/><rect class="d" x="16.3" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="4.5" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="16.3" y="6.5" width="3.2" height="11" rx="1.3"/><path d="M2.5 9.5v5M21.5 9.5v5M7.7 12h8.6"/>',
   timer: '<circle class="d" cx="12" cy="13.5" r="7.5"/><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M12 2.5v3.5M18.6 6.9l1.5-1.5"/>',
   trophy: '<path class="d" d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5A2.5 2.5 0 0 0 7 10.5M17 6h2.5A2.5 2.5 0 0 1 17 10.5M12 14v3.5M8.5 20.5h7M9.5 17.5h5v3h-5z"/>',
+  cart: '<path class="d" d="M6.2 6.5h14l-1.7 7.4a2 2 0 0 1-2 1.6H9.4a2 2 0 0 1-2-1.6z"/><path d="M2.8 3.5h2.3l2.3 10.4a2 2 0 0 0 2 1.6h7.1a2 2 0 0 0 2-1.6l1.7-7.4H6.2"/><circle cx="10" cy="19.5" r="1.3"/><circle cx="16.5" cy="19.5" r="1.3"/>',
   file: '<path class="d" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
 };
 function icon(name, size = 22, extra = '') {
@@ -853,7 +854,7 @@ function editHtml() {
     <label class="field"><span>${tr('עם (מופרד בפסיקים)', 'With (comma separated)')}</span><input type="text" value="${esc((it.with || []).join(', '))}" data-on="eWith" placeholder="${tr('למשל: גזר, מלפפון', 'e.g. carrot, cucumber')}"></label>
     <label class="field"><span>${tr('הערה', 'Note')}</span><input type="text" value="${esc(it.note || '')}" data-on="eNote" placeholder="${tr('למשל: ללא סוכר', 'e.g. no sugar')}"></label>
     <div class="field"><span>${tr('ארוחה', 'Meal')}</span><div class="seg">${seg}</div></div>
-    ${nutOn() ? `<div id="eNut">${editNutHtml()}</div>` : ''}
+    ${nutOn() ? `<div id="eNut">${editNutHtml()}</div>${editProdHtml()}` : ''}
   </div>
   <footer>
     <button class="btn danger" data-act="eDelete">${icon('trash', 18)}${tr('מחק', 'Delete')}</button>
@@ -862,7 +863,7 @@ function editHtml() {
   </footer>`;
 }
 
-function refreshEditNut() { const b = $('#eNut'); if (b) b.innerHTML = editNutHtml(); }
+function refreshEditNut() { const b = $('#eNut'); if (b) b.innerHTML = editNutHtml(); const p = $('#eProd'); if (p) p.outerHTML = editProdHtml(); }
 function editNutHtml() {
   const it = EDIT.it;
   if (!it || !it.name) return '';
@@ -1591,7 +1592,7 @@ const ON = {
   dayNote: debounce((el) => { const d = getDay(S.date, true); d.note = el.value; cleanupDay(S.date); save(); }, 400),
   addText(el) { ADD.text = el.value; const live = $('#addLive'); if (live) live.innerHTML = addLiveHtml(); },
   histSearch: debounce((el) => { S.histQuery = el.value; S.histLimit = 40; render({ keepScroll: true }); const i = $('[data-on="histSearch"]'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250),
-  eName(el) { EDIT.it.name = el.value; delete EDIT.it.said; delete EDIT.it.amb; refreshEditNut(); },
+  eName(el) { EDIT.it.name = el.value; delete EDIT.it.said; delete EDIT.it.amb; delete EDIT.it.prod; refreshEditNut(); },
   eUnit(el) { EDIT.it.unit = el.value || null; if (EDIT.it.unit && EDIT.it.qty == null) { EDIT.it.qty = 1; $('#eQtyVal').textContent = '1'; } refreshEditNut(); },
   eWith(el) { EDIT.it.with = el.value.split(/[,،]/).map(s => s.trim()).filter(Boolean).map(canonical); refreshEditNut(); },
   eNote(el) { EDIT.it.note = el.value.trim(); },
@@ -1687,8 +1688,8 @@ document.addEventListener('submit', (e) => {
   if (e.target.dataset.form === 'weight') weightSubmit();
   if (e.target.dataset.form === 'chat') { const t = e.target.querySelector('textarea'); aiSend(t ? t.value : AI.draft); }
 });
-Object.assign(ACT, AI_ACT, GYM_ACT, NUT_ACT, WT_ACT, CL_ACT);
-Object.assign(ON, AI_ON, GYM_ON, NUT_ON, WT_ON, CL_ON);
+Object.assign(ACT, AI_ACT, GYM_ACT, NUT_ACT, WT_ACT, CL_ACT, MKT_ACT);
+Object.assign(ON, AI_ON, GYM_ON, NUT_ON, WT_ON, CL_ON, MKT_ON);
 $('#datePicker').addEventListener('change', (e) => { if (e.target.value) setDate(e.target.value); });
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (db.settings.theme === 'auto') applyTheme(); });
 

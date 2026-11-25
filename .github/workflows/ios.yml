@@ -6,6 +6,7 @@ on:
       - 'ios/**'
       - 'app/src/main/assets/www/**'
       - '.github/workflows/ios.yml'
+      - 'tools/fetch_products.py'
   workflow_dispatch:
 
 permissions:
@@ -20,6 +21,25 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Week (the supermarket product list is downloaded once a week)
+        id: week
+        run: echo "w=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Restore the supermarket product list
+        id: products
+        uses: actions/cache@v4
+        with:
+          path: app/src/main/assets/www/products.js
+          key: products-${{ steps.week.outputs.w }}
+          restore-keys: products-
+      - name: Download products sold in Israel from Open Food Facts
+        if: steps.products.outputs.cache-hit != 'true'
+        continue-on-error: true
+        timeout-minutes: 25
+        run: |
+          python3 tools/fetch_products.py "$RUNNER_TEMP/products.js"
+          mv "$RUNNER_TEMP/products.js" app/src/main/assets/www/products.js
+      - name: Product list in the app
+        run: ls -la app/src/main/assets/www/products.js || echo "No product list this time"
       - name: Xcode version
         run: xcodebuild -version
       - name: Install XcodeGen
