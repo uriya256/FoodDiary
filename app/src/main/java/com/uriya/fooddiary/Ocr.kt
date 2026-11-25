@@ -83,13 +83,13 @@ object Ocr {
         return out
     }
 
-    /** Returns the recognized text, or null when the language files are missing. */
-    fun recognize(ctx: Context, bmp: Bitmap): String? {
+    /** Returns the recognized text, or null when the language files are missing. psm: how the page is laid out. */
+    fun recognize(ctx: Context, bmp: Bitmap, psm: Int = TessBaseAPI.PageSegMode.PSM_AUTO): String? {
         val path = dataDir(ctx) ?: return null
         val tess = TessBaseAPI()
         return try {
             if (!tess.init(path, LANGS.joinToString("+"))) return null
-            tess.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO)
+            tess.setPageSegMode(psm)
             tess.setImage(prepare(bmp))
             tess.getUTF8Text() ?: ""
         } finally {

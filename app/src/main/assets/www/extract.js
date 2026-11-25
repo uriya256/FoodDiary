@@ -94,10 +94,29 @@
   }
   function count(o) { return ['k', 'p', 'c', 'f'].filter(function (k) { return o[k] != null; }).length; }
 
+  // names of every row a nutrition table may have, so a table read column by column can be matched up
+  var ROW = /(אנרג|קלורי|חלבו|פחמי|סוכר|שומנ|שומן|רוו|טראנס|כולסטרול|נתרן|סיבים|סידן|מלח|ויטמין|ברזל|אשלגן|energy|calor|protein|carb|sugar|fat|satur|trans|cholest|sodium|fib(?:er|re)|salt|calcium)/i;
+  var NUMLINE = /^\s*(\d+(?:[.,]\d+)?)(?:\s*(?:גרם|ג['׳]|מ["״]?ג|קק["״]?ל|קלוריות|g|mg|kcal))?(?:\s+\d+(?:[.,]\d+)?(?:\s*(?:גרם|ג['׳]|מ["״]?ג|g|mg))?)?\s*$/i;
+  /** The reader sometimes gives all the row names, then all the numbers: match them by order. */
+  function byColumns(lines, a) {
+    var rows = [], nums = [];
+    lines.forEach(function (l) {
+      if (ROW.test(l) && !/\d/.test(l)) rows.push(l);
+      else { var m = l.match(NUMLINE); if (m) nums.push(num(m[1])); }
+    });
+    if (rows.length < 3 || nums.length < rows.length) return a;
+    var o = { k: a.k, p: a.p, c: a.c, f: a.f };
+    ['k', 'p', 'c', 'f'].forEach(function (k) {
+      if (o[k] != null) return;
+      for (var i = 0; i < rows.length; i++) if (LABELS[k].test(rows[i]) && !NOT[k].test(rows[i])) { o[k] = nums[i]; break; }
+    });
+    return o;
+  }
   /** Values from plain text (a photographed label read by OCR). */
   function fromText(text) {
     var t = String(text || '').replace(/[|]/g, ' ');
     var a = read(linesOf(t));
+    if (count(a) < 4) a = byColumns(section(linesOf(t)), a);
     ['p', 'c', 'f'].forEach(function (k) { if (a[k] != null && (a[k] < 0 || a[k] > 100)) a[k] = null; });
     if (a.k != null && (a.k <= 0 || a.k >= 950)) a.k = null;
     var sv = t.match(/(גודל\s*(?:ה)?מנה|מנה\s*(?:של|=)|serving\s*size)[^\d\n]{0,20}(\d+(?:[.,]\d+)?)\s*(גרם|ג['׳]|g\b|מ["״]?ל|ml)/i);

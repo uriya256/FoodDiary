@@ -133,18 +133,23 @@ class MainActivity : ComponentActivity() {
         }.start()
     }
 
-    /** Reads the last label photo offline; the text goes to window.onLabelText. */
-    fun labelOcr() {
+    /**
+     * Reads the last label photo offline; the text goes to window.onLabelText.
+     * mode "block" reads it as one block of rows (keeps a table's name and number on one line), "auto" lets the reader find columns.
+     */
+    fun labelOcr(mode: String) {
+        val psm = if (mode == "auto") com.googlecode.tesseract.android.TessBaseAPI.PageSegMode.PSM_AUTO
+                  else com.googlecode.tesseract.android.TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK
         val uri = labelUri
         if (uri == null) { js("window.onLabelText && window.onLabelText(null, 'error', 'image')"); return }
         Thread {
             var err: String? = null
             val result = try {
                 val bmp = Ocr.loadBitmap(this, uri)
-                if (bmp == null) { err = "image"; null } else Ocr.recognize(this, bmp).also { if (it == null) err = "data" }
+                if (bmp == null) { err = "image"; null } else Ocr.recognize(this, bmp, psm).also { if (it == null) err = "data" }
             } catch (e: Throwable) { err = e.toString(); null }
             if (result == null) js("window.onLabelText && window.onLabelText(null, 'error', " + JSONObject.quote(err ?: "") + ")")
-            else js("window.onLabelText && window.onLabelText(" + JSONObject.quote(result) + ", 'ok')")
+            else js("window.onLabelText && window.onLabelText(" + JSONObject.quote(result) + ", 'ok', " + JSONObject.quote(mode) + ")")
         }.start()
     }
 

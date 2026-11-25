@@ -81,7 +81,7 @@ class Bridge(private val act: MainActivity) {
 
     /** Reads the last nutrition-label photo offline (window.onLabelText). */
     @JavascriptInterface
-    fun labelOcr() = act.labelOcr()
+    fun labelOcr(mode: String) = act.labelOcr(mode)
 
     @JavascriptInterface
     fun ocrCamera() = act.ocrCamera()

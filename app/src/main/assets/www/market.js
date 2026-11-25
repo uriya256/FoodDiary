@@ -82,10 +82,45 @@ function mktPhotoHtml() {
     <div class="small muted">${gem ? tr('Gemini קורא את טבלת הערכים מהתמונה (צריך אינטרנט).', 'Gemini reads the nutrition table from the photo (needs internet).') + (phone ? tr(' בלי רשת, הזיהוי נעשה בטלפון.', ' Without a connection the phone reads it.') : '') : phone ? tr('הזיהוי נעשה בטלפון, בלי אינטרנט. צלם רק את טבלת הערכים, ישר ובאור טוב. עם מפתח Gemini (בצ׳אט) הקריאה מדויקת יותר.', 'The phone reads it, offline. Photograph just the nutrition table, straight and in good light. With a Gemini key (in the chat) reading is more accurate.') : tr('במחשב, קריאה של תמונה צריכה מפתח Gemini (מגדירים בצ׳אט). בטלפון זה עובד גם בלי.', 'On the computer, reading a photo needs a Gemini key (set it up in the chat). On the phone it works without one.')}</div>
   </div>`;
 }
-const LABEL_PROMPT = 'This photo shows a food product\'s nutrition label, usually in Hebrew ("ערכים תזונתיים"). ' +
-  'Read the column for 100 g (or 100 ml), not the one for a serving. Reply with JSON only: ' +
-  '{"name": product name if it is visible, else "", "k": energy in kcal (convert from kJ if only kJ is given), "p": protein g, "c": total carbohydrates g, "f": total fat g, "g": serving size in grams if written, else null}. ' +
-  'Use null for anything you cannot read clearly. Do not guess.';
+const LABEL_PROMPT = 'Read the nutrition facts table in this photo of a food package. Israeli labels are in Hebrew: ' +
+  'אנרגיה / קלוריות = energy, חלבונים = protein, פחמימות = carbohydrates, שומנים = fat ("מתוכם" rows are parts of the line above, skip them). ' +
+  'Give the values per 100 g (or per 100 ml): use the 100 g column; if the label only has values per serving, convert them to 100 g with the serving size. ' +
+  'k = energy in kcal (if only kJ is shown, divide by 4.184), p = protein g, c = total carbohydrates g, f = total fat g, ' +
+  'g = the serving size in grams if it is written (else null), name = the product name if it is visible (else ""). ' +
+  'Numbers only. Use null only for a value that is really not in the photo.';
+const LABEL_SCHEMA = {
+  type: 'OBJECT',
+  properties: { name: { type: 'STRING' }, k: { type: 'NUMBER', nullable: true }, p: { type: 'NUMBER', nullable: true }, c: { type: 'NUMBER', nullable: true }, f: { type: 'NUMBER', nullable: true }, g: { type: 'NUMBER', nullable: true } },
+  required: ['k', 'p', 'c', 'f'],
+};
+/** The values in Gemini's answer, whatever the keys came back as. */
+function mktLabelFrom(v) {
+  if (!v || typeof v !== 'object') return null;
+  if (Array.isArray(v)) v = v[0] || {};
+  const flat = {};
+  const walk = (o) => { for (const k in o) { const x = o[k]; if (x && typeof x === 'object' && !Array.isArray(x)) walk(x); else if (!(k.toLowerCase() in flat)) flat[k.toLowerCase()] = x; } };
+  walk(v);
+  const pick = (...keys) => { for (const k of keys) if (flat[k] != null) { const n = mktNum(flat[k]); if (n != null) return n; } return null; };
+  return {
+    k: pick('k', 'kcal', 'calories', 'energy_kcal', 'energy', 'קלוריות', 'אנרגיה'),
+    p: pick('p', 'protein', 'proteins', 'חלבון', 'חלבונים'),
+    c: pick('c', 'carbs', 'carbohydrates', 'carbohydrate', 'פחמימות'),
+    f: pick('f', 'fat', 'fats', 'total_fat', 'שומן', 'שומנים'),
+    g: pick('g', 'serving', 'serving_size', 'serving_g'),
+    name: typeof flat.name === 'string' ? flat.name : '',
+  };
+}
+/** Why Gemini didn't read the photo, in words for the user. */
+function mktGemWhy(code, body) {
+  let msg = '';
+  try { msg = (JSON.parse(body).error || {}).message || ''; } catch (e) { msg = String(body || ''); }
+  msg = msg.replace(/\s+/g, ' ').slice(0, 140);
+  if (code === 0) return tr('אין חיבור לאינטרנט', 'no internet connection');
+  if (code === 429) return tr('הגעת למגבלת השימוש החינמית לרגע', 'the free usage limit was reached for now');
+  if (code === 401 || code === 403 || /API_KEY|api key/i.test(msg)) return tr('המפתח לא תקין', 'the key is not valid');
+  if (code === 'empty') return tr('לא מצא ערכים בתמונה', "it didn't find values in the photo");
+  return `${tr('שגיאה', 'error')} ${code}${msg ? ': ' + msg : ''}`;
+}
 function mktReading(t) { MKT.reading = t; if (MKT.step === 'search') replaceSheetBody('market', mktHtml()); }
 /** A photo of the label arrived (base64 JPEG): Gemini if there is a key, else (or if it fails) the phone's own reader. */
 window.onLabelPhoto = (b64, status, detail) => {
@@ -94,8 +129,9 @@ window.onLabelPhoto = (b64, status, detail) => {
     toast(status === 'nocamera' ? tr('לא הצלחתי לפתוח את המצלמה', "Couldn't open the camera") : tr('לא הצלחתי לפתוח את התמונה', "Couldn't open the photo"));
     return;
   }
+  MKT.gemErr = '';
   const offline = () => {
-    if (A && A.labelOcr) { mktReading(tr('קורא את התמונה בטלפון…', 'Reading the photo on the phone…')); A.labelOcr(); return true; }
+    if (A && A.labelOcr) { mktReading(tr('קורא את התמונה בטלפון…', 'Reading the photo on the phone…')); A.labelOcr('block'); return true; }
     return false;
   };
   if (!aiSet().key) {
@@ -103,29 +139,43 @@ window.onLabelPhoto = (b64, status, detail) => {
     return;
   }
   mktReading(tr('Gemini קורא את הערכים מהתמונה…', 'Gemini is reading the values…'));
-  const s = aiSet(), model = s.model || 'gemini-flash-latest';
-  const body = {
-    contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/jpeg', data: b64 } }, { text: LABEL_PROMPT }] }],
-    generationConfig: Object.assign(aiGenCfg(model, (s.think || {})[model] ? 1 : 0), { responseMimeType: 'application/json' }),
+  const s = aiSet(), main = s.model || 'gemini-flash-latest';
+  const tries = [{ model: main, schema: true }, { model: main, schema: false }];
+  if (s.fallback && s.fallback !== main) tries.push({ model: s.fallback, schema: false });
+  let why = '', best = null, bestRaw = '';
+  const next = () => {
+    const t = tries.shift();
+    if (!t) {
+      MKT.gemErr = why;
+      if (best) { mktGotLabel(best, 'gemini', bestRaw); return; }
+      if (!offline()) { mktReading(''); toast(tr('Gemini לא הצליח לקרוא את התמונה', "Gemini couldn't read the photo") + (why ? ` (${why})` : '')); }
+      return;
+    }
+    const gc = Object.assign(aiGenCfg(t.model, (s.think || {})[t.model] ? 1 : 0), { responseMimeType: 'application/json' });
+    if (t.schema) gc.responseSchema = LABEL_SCHEMA;
+    const body = { contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/jpeg', data: b64 } }, { text: LABEL_PROMPT }] }], generationConfig: gc };
+    let out = '';
+    aiStream(t.model, body, {
+      chunk(x) { out += x; },
+      blocked(fr) { why = `${tr('נחסם', 'blocked')} (${fr})`; },
+      truncated() { },
+      done() {
+        let v = null;
+        try { v = JSON.parse(out.slice(out.search(/[[{]/), Math.max(out.lastIndexOf('}'), out.lastIndexOf(']')) + 1)); } catch (e) { v = null; }
+        const vals = mktLabelFrom(v);
+        const have = vals ? ['k', 'p', 'c', 'f'].filter(k => vals[k] != null).length : 0;
+        if (have >= 3) { MKT.gemErr = ''; mktGotLabel(vals, 'gemini', ''); return; }
+        if (have && (!best || have > ['k', 'p', 'c', 'f'].filter(k => best[k] != null).length)) { best = vals; bestRaw = out; }
+        why = out.trim() ? mktGemWhy('empty') : tr('לא התקבלה תשובה', 'no answer came back');
+        next();
+      },
+      error(code, body) { why = mktGemWhy(code, body); next(); },
+    });
   };
-  let out = '';
-  const fail = () => { if (!offline()) { mktReading(''); toast(tr('לא הצלחתי לקרוא את הערכים מהתמונה. אפשר להקליד אותם.', "Couldn't read the values from the photo. You can type them.")); } };
-  aiStream(model, body, {
-    chunk(t) { out += t; },
-    blocked() { },
-    truncated() { },
-    done() {
-      let v = null;
-      try { v = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1)); } catch (e) { v = null; }
-      const vals = v && { k: mktNum(v.k), p: mktNum(v.p), c: mktNum(v.c), f: mktNum(v.f), g: mktNum(v.g), name: typeof v.name === 'string' ? v.name : '' };
-      if (vals && ['k', 'p', 'c', 'f'].filter(k => vals[k] != null).length >= 2) mktGotLabel(vals, 'gemini', '');
-      else fail();
-    },
-    error() { fail(); },
-  });
+  next();
 };
 function mktNum(x) { const v = parseFloat(String(x == null ? '' : x).replace(',', '.')); return isFinite(v) && v >= 0 ? v : null; }
-/** The phone read the photo's text offline. */
+/** The phone read the photo's text offline: first as one block of rows, then (if that missed values) letting it find columns. */
 window.onLabelText = (text, status, detail) => {
   if (text == null) {
     mktReading('');
@@ -133,7 +183,15 @@ window.onLabelText = (text, status, detail) => {
     return;
   }
   const a = window.FDLabel ? window.FDLabel.fromText(text) : {};
-  mktGotLabel(a, 'ocr', text);
+  const have = (x) => ['k', 'p', 'c', 'f'].filter(k => x[k] != null).length;
+  if (detail !== 'auto') {
+    if (have(a) < 4 && A && A.labelOcr) { MKT.ocrFirst = { a, text }; mktReading(tr('קורא שוב, בדרך אחרת…', 'Reading it again another way…')); A.labelOcr('auto'); return; }
+    mktGotLabel(a, 'ocr', text);
+    return;
+  }
+  const first = MKT.ocrFirst; MKT.ocrFirst = null;
+  if (first && have(first.a) >= have(a)) mktGotLabel(first.a, 'ocr', first.text);
+  else mktGotLabel(a, 'ocr', first ? first.text + '\n\n— — —\n\n' + text : text);
 };
 function mktGotLabel(v, how, raw) {
   MKT.reading = '';
@@ -203,6 +261,7 @@ function mktConfirmHtml() {
   const field = (k, label, grow = ' grow') => `<label class="field${grow}"><span>${label}</span><input class="gnum" type="number" inputmode="decimal" min="0" step="any" data-on="mktVal" data-k="${k}" value="${v[k] == null ? '' : v[k]}"></label>`;
   return `<div class="body">
     ${v.how ? `<div class="small ${v.missing ? 'warn-t' : 'muted'}">${v.missing === 4 ? tr('לא מצאתי ערכים בתמונה. אפשר להקליד אותם, או לצלם שוב רק את הטבלה, ישר ובאור טוב.', "I couldn't find values in the photo. Type them, or photograph just the table again, straight and in good light.") : (v.how === 'gemini' ? tr('הערכים נקראו מהתמונה עם Gemini.', 'Values read from the photo with Gemini.') : tr('הערכים נקראו מהתמונה בטלפון.', 'Values read from the photo on the phone.')) + ' ' + (v.missing ? tr('חלק חסרים, השלם אותם מהתווית.', 'Some are missing; fill them in from the label.') : tr('בדוק שהם כמו בתווית, בעמודה של 100 גרם.', 'Check they match the label, in the 100 g column.'))}</div>
+    ${v.how === 'ocr' && MKT.gemErr ? `<div class="small warn-t">${tr(`Gemini לא הצליח (${esc(MKT.gemErr)}), אז הטלפון קרא את התמונה בעצמו.`, `Gemini didn't manage (${esc(MKT.gemErr)}), so the phone read the photo itself.`)}</div>` : ''}
     ${v.raw ? `<details class="small"><summary>${tr('הטקסט שזוהה בתמונה', 'Text found in the photo')}</summary><pre class="rawocr">${esc(v.raw)}</pre></details>` : ''}`
     : v.missing ? `<div class="small warn-t">${tr('לא מצאתי בדף את כל הערכים. השלם את החסר מהתווית.', "Not every value was on the page. Fill in what's missing from the label.")}</div>` : v.url ? `<div class="small muted">${tr(`הערכים נקראו מהאתר ${esc(v.site)}. כדאי לוודא שהם ל-100 גרם.`, `Values read from ${esc(v.site)}. Check that they are per 100 g.`)}</div>` : ''}
     <label class="field"><span>${tr('שם המוצר', 'Product name')}</span><input type="text" data-on="mktVal" data-k="n" value="${esc(v.n || '')}"></label>
