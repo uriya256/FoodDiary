@@ -14,6 +14,16 @@ class Bridge(private val act: MainActivity) {
     @JavascriptInterface
     fun isApp(): Boolean = true
 
+    /** A manufacturer's web page over the app, to read a product's nutrition values. */
+    @JavascriptInterface
+    fun openWeb(url: String, lang: String, dark: Boolean) = act.openWeb(url, lang, dark)
+
+    @JavascriptInterface
+    fun closeWeb() = act.closeWebPanel(false)
+
+    @JavascriptInterface
+    fun webMessage(text: String) = act.webMessage(text)
+
     private fun en() = prefs.getString("lang", "he") == "en"
 
     /** "he" or "en": used for notification texts and system dialogs. */

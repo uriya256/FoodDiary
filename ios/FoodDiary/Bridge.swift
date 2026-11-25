@@ -16,7 +16,7 @@ final class Bridge {
       var post = function (m, a) { try { window.webkit.messageHandlers.fd.postMessage({ m: m, a: a }); } catch (e) { } };
       var SYNC = ['isApp', 'appVersion', 'readClipboard', 'clipboardChanged', 'readAutoBackup', 'takePendingWater', 'hasNotificationPermission', 'ocrHebrew'];
       var ASYNC = ['setLang', 'saveFile', 'shareText', 'toast', 'setBars', 'photo', 'ocrCamera', 'ocrGallery', 'setReminder', 'setDayStatus',
-        'aiStream', 'aiGet', 'aiCancel', 'setWaterStatus', 'setWaterReminder', 'requestNotificationPermission', 'restStart', 'restCancel', 'vibrate', 'autoBackup'];
+        'aiStream', 'aiGet', 'aiCancel', 'setWaterStatus', 'setWaterReminder', 'requestNotificationPermission', 'restStart', 'restCancel', 'vibrate', 'autoBackup', 'openWeb', 'closeWeb', 'webMessage'];
       var A = {};
       SYNC.forEach(function (n) { A[n] = function () { return call(n, Array.prototype.slice.call(arguments)); }; });
       ASYNC.forEach(function (n) { A[n] = function () { post(n, Array.prototype.slice.call(arguments)); }; });
@@ -96,6 +96,9 @@ final class Bridge {
         case "restCancel": Notifications.restCancel()
         case "vibrate": Haptics.buzz(long: bool(a, 0))
         case "autoBackup": Backup.write(str(a, 0))
+        case "openWeb": vc.openWeb(url: str(a, 0), lang: str(a, 1), dark: bool(a, 2))
+        case "closeWeb": vc.closeWeb()
+        case "webMessage": vc.webMessage(str(a, 0))
         default: break
         }
     }

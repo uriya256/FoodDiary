@@ -195,7 +195,7 @@ function nutDayHtml() {
       const r = resolveFood(it.name);
       const flag = x.unknown ? `<span class="bal off">${tr('בלי ערכים', 'No values')}</span>` : x.guess ? `<span class="bal near">${tr('הערכה גסה', 'Rough guess')}</span>` : '';
       h += `<button class="li" data-act="openNutEdit" data-name="${esc(r ? r.name : it.name)}">
-        <span class="grow"><span class="t">${esc(P.formatItem(it, { short: true }))}</span>${(() => { const pr = prodOf(it); return pr ? `<br><span class="s">${icon('cart', 13)} ${prodLabel(pr)}</span>` : ''; })()}<br><span class="s">${x.unknown ? tr('הקש כדי להוסיף ערכים', 'Tap to add values') : `${tr('חלבון', 'Protein')} ${gr(x.p)} · ${tr('פחמימות', 'Carbs')} ${gr(x.c)} · ${tr('שומן', 'Fat')} ${gr(x.f)} ${tr('ג׳', 'g')} · ≈${Math.round(x.g)} ${tr('ג׳', 'g')}`}</span></span>
+        <span class="grow"><span class="t">${esc(P.formatItem(it, { short: true }))}</span>${(() => { const pr = prodOf(it); return pr ? `<br><span class="s">${icon('globe', 13)} ${prodLabel(pr)}</span>` : ''; })()}<br><span class="s">${x.unknown ? tr('הקש כדי להוסיף ערכים', 'Tap to add values') : `${tr('חלבון', 'Protein')} ${gr(x.p)} · ${tr('פחמימות', 'Carbs')} ${gr(x.c)} · ${tr('שומן', 'Fat')} ${gr(x.f)} ${tr('ג׳', 'g')} · ≈${Math.round(x.g)} ${tr('ג׳', 'g')}`}</span></span>
         ${flag}<b class="kcal">${x.unknown ? '–' : kc(x.k)}</b></button>`;
     }
     h += `</div>`;
@@ -219,11 +219,11 @@ function nutEditHtml() {
   const per = NUTED.mode === 'serv' ? g / 100 : 1;
   const v = (x) => Math.round(x * per * 10) / 10;
   const ux = db.nut && db.nut[r.name];
-  const srcTxt = ux && ux.prod ? `${icon('cart', 15)} ${tr('לפי המוצר', 'From the product')} ${prodLabel(ux.prod)}` : cur.src === 'user' ? tr('ערכים שהזנת', 'Your values') : cur.src === 'db' ? tr('ערכים מובנים (ממוצע)', 'Built-in values (average)') : cur.src === 'cat' ? tr(`הערכה גסה לפי הקטגוריה "${catLabel(r.cat)}"`, `Rough guess from the category "${catLabel(r.cat)}"`) : tr('אין ערכים', 'No values');
+  const srcTxt = ux && ux.prod ? `${icon('globe', 15)} ${tr('לפי המוצר', 'From the product')} ${prodLabel(ux.prod)}` : cur.src === 'user' ? tr('ערכים שהזנת', 'Your values') : cur.src === 'db' ? tr('ערכים מובנים (ממוצע)', 'Built-in values (average)') : cur.src === 'cat' ? tr(`הערכה גסה לפי הקטגוריה "${catLabel(r.cat)}"`, `Rough guess from the category "${catLabel(r.cat)}"`) : tr('אין ערכים', 'No values');
   const field = (k, label) => `<label class="field grow"><span>${label}</span><input class="gnum" type="number" inputmode="decimal" min="0" step="any" data-nut="${k}" value="${cur.src ? v(cur[k]) : ''}"></label>`;
   return sheetHead(esc(r.name)) + `<div class="body">
     <div class="small muted">${srcTxt}</div>
-    <button class="btn block" data-act="openMarket" data-name="${esc(r.name)}" data-from="nut">${icon('cart', 18)}${ux && ux.prod ? tr('החלפת המוצר', 'Change the product') : tr('בחירת מוצר מהסופר', 'Pick a supermarket product')}</button>
+    <button class="btn block" data-act="openMarket" data-name="${esc(r.name)}" data-from="nut">${icon('globe', 18)}${ux && ux.prod ? tr('החלפת המוצר', 'Change the product') : tr('מוצר מאתר היצרן', "Product from the maker's site")}</button>
     <div class="seg">${[['100', tr('ל-100 גרם', 'Per 100 g')], ['serv', gk === 'piece' ? tr('ליחידה אחת', 'Per piece') : tr('למנה', 'Per serving')]].map(([m, l]) => `<button data-act="nutMode" data-v="${m}" aria-pressed="${NUTED.mode === m}">${l}</button>`).join('')}</div>
     <label class="field"><span>${gk === 'piece' ? tr('משקל יחידה אחת (גרם)', 'Weight of one piece (g)') : tr('משקל מנה (גרם)', 'Serving weight (g)')}</span><input class="gnum" type="number" inputmode="decimal" min="1" step="any" data-nut="g" value="${Math.round(g * 10) / 10}"></label>
     ${field('k', tr('קלוריות', 'Calories'))}

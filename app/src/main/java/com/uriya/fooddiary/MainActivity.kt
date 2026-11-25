@@ -15,6 +15,12 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import android.view.Gravity
+import android.text.TextUtils
+import android.graphics.drawable.GradientDrawable
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -205,6 +211,8 @@ class MainActivity : ComponentActivity() {
             lp.bottomMargin = if (imeOpen) ime.bottom else 0
             web.layoutParams = lp
             insetsJs = "window.setInsets && window.setInsets($top, ${if (imeOpen) 0 else bottom})"
+            panelTop = bars.top; panelBottom = maxOf(bars.bottom, ime.bottom)
+            webPanel?.setPadding(0, panelTop, 0, panelBottom)
             if (pageReady) js(insetsJs!!)
             WindowInsetsCompat.CONSUMED
         }
@@ -268,6 +276,11 @@ class MainActivity : ComponentActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (webPanel != null) {
+                    val b = browser
+                    if (b != null && b.canGoBack()) b.goBack() else closeWebPanel(true)
+                    return
+                }
                 web.evaluateJavascript("(window.appBack ? window.appBack() : false)") { r ->
                     if (r != "true") {
                         isEnabled = false
@@ -326,6 +339,98 @@ class MainActivity : ComponentActivity() {
     }
 
     private val pendingJs = mutableListOf<String>()
+
+    // ---------- a manufacturer's web page inside the app, to read a product's nutrition values ----------
+    private var webPanel: LinearLayout? = null
+    private var browser: WebView? = null
+    private var panelTop = 0
+    private var panelBottom = 0
+    private val extractJs: String by lazy {
+        try { assets.open("www/extract.js").bufferedReader().use { it.readText() } } catch (_: Exception) { "JSON.stringify({ok:false})" }
+    }
+
+    /** Opens a web page over the app, with a button that reads the nutrition table from it (www/extract.js). */
+    @SuppressLint("SetJavaScriptEnabled")
+    fun openWeb(url: String, lang: String, dark: Boolean) {
+        runOnUiThread {
+            removeWebPanel()
+            val he = lang != "en"
+            val d = resources.displayMetrics.density
+            fun dp(v: Int) = (v * d).toInt()
+            val bg = if (dark) Color.parseColor("#1B1D1A") else Color.WHITE
+            val fg = if (dark) Color.parseColor("#ECEDE8") else Color.parseColor("#1D2620")
+            val panel = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(bg)
+                isClickable = true
+                setPadding(0, panelTop, 0, panelBottom)
+                layoutDirection = if (he) android.view.View.LAYOUT_DIRECTION_RTL else android.view.View.LAYOUT_DIRECTION_LTR
+            }
+            val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), dp(2), dp(12), dp(2)) }
+            val close = TextView(this).apply {
+                text = "✕"; textSize = 20f; setTextColor(fg); gravity = Gravity.CENTER
+                contentDescription = if (he) "סגירה" else "Close"
+                setOnClickListener { closeWebPanel(true) }
+            }
+            val title = TextView(this).apply {
+                text = if (he) "טוען…" else "Loading…"; textSize = 15f; setTextColor(fg)
+                maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+            }
+            bar.addView(close, LinearLayout.LayoutParams(dp(48), dp(48)))
+            bar.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            val wv = WebView(this)
+            wv.settings.javaScriptEnabled = true
+            wv.settings.domStorageEnabled = true
+            wv.settings.useWideViewPort = true
+            wv.settings.loadWithOverviewMode = true
+            wv.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    val sc = request.url.scheme ?: ""
+                    return !(sc == "http" || sc == "https") // stay on the web; ignore app links
+                }
+                override fun onPageFinished(view: WebView, u: String?) {
+                    title.text = view.title?.takeIf { it.isNotBlank() } ?: (u ?: "")
+                }
+            }
+            val take = TextView(this).apply {
+                text = if (he) "קח את הערכים מהדף" else "Use the values on this page"
+                textSize = 16f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                background = GradientDrawable().apply { setColor(Color.parseColor("#2F7D4F")); cornerRadius = 14 * d }
+                setOnClickListener {
+                    wv.evaluateJavascript(extractJs) { r -> js("window.onWebValues && window.onWebValues(${r ?: "null"})") }
+                }
+            }
+            panel.addView(bar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            panel.addView(wv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+            panel.addView(take, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)).apply { setMargins(dp(12), dp(8), dp(12), dp(10)) })
+            root.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+            webPanel = panel
+            browser = wv
+            wv.loadUrl(url)
+        }
+    }
+
+    private fun removeWebPanel() {
+        val p = webPanel ?: return
+        browser?.let { b -> b.stopLoading(); b.loadUrl("about:blank"); b.destroy() }
+        root.removeView(p)
+        webPanel = null
+        browser = null
+    }
+
+    /** byUser: closed with ✕ or back, so the page hears about it. */
+    fun closeWebPanel(byUser: Boolean) {
+        runOnUiThread {
+            if (webPanel == null) return@runOnUiThread
+            removeWebPanel()
+            if (byUser) js("window.onWebClosed && window.onWebClosed()")
+        }
+    }
+
+    fun webMessage(text: String) {
+        runOnUiThread { Toast.makeText(this, text, Toast.LENGTH_LONG).show() }
+    }
 
     fun js(code: String) {
         runOnUiThread {

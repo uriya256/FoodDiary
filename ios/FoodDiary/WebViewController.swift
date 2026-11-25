@@ -150,6 +150,22 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         setNeedsStatusBarAppearanceUpdate()
     }
 
+    // MARK: a manufacturer's web page, to read a product's nutrition values
+    private weak var webPage: WebPageViewController?
+
+    func openWeb(url: String, lang: String, dark: Bool) {
+        guard let u = URL(string: url) else { return }
+        let page = WebPageViewController(url: u, he: lang != "en", dark: dark)
+        page.onValues = { [weak self] s in self?.js("window.onWebValues && window.onWebValues(\(jsq(s)))") }
+        page.onClosed = { [weak self] in self?.js("window.onWebClosed && window.onWebClosed()") }
+        let nav = UINavigationController(rootViewController: page)
+        nav.modalPresentationStyle = .fullScreen
+        let show = { self.topPresenter().present(nav, animated: true); self.webPage = page }
+        if let old = webPage?.navigationController { old.dismiss(animated: false, completion: show) } else { show() }
+    }
+    func closeWeb() { webPage?.navigationController?.dismiss(animated: true) }
+    func webMessage(_ text: String) { webPage?.flash(text) }
+
     private func topPresenter() -> UIViewController {
         var top: UIViewController = self
         while let p = top.presentedViewController { top = p }

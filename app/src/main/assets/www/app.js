@@ -89,7 +89,6 @@ const IC = {
   dumbbell: '<rect class="d" x="4.5" y="6.5" width="3.2" height="11" rx="1.3"/><rect class="d" x="16.3" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="4.5" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="16.3" y="6.5" width="3.2" height="11" rx="1.3"/><path d="M2.5 9.5v5M21.5 9.5v5M7.7 12h8.6"/>',
   timer: '<circle class="d" cx="12" cy="13.5" r="7.5"/><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M12 2.5v3.5M18.6 6.9l1.5-1.5"/>',
   trophy: '<path class="d" d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5A2.5 2.5 0 0 0 7 10.5M17 6h2.5A2.5 2.5 0 0 1 17 10.5M12 14v3.5M8.5 20.5h7M9.5 17.5h5v3h-5z"/>',
-  cart: '<path class="d" d="M6.2 6.5h14l-1.7 7.4a2 2 0 0 1-2 1.6H9.4a2 2 0 0 1-2-1.6z"/><path d="M2.8 3.5h2.3l2.3 10.4a2 2 0 0 0 2 1.6h7.1a2 2 0 0 0 2-1.6l1.7-7.4H6.2"/><circle cx="10" cy="19.5" r="1.3"/><circle cx="16.5" cy="19.5" r="1.3"/>',
   file: '<path class="d" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
 };
 function icon(name, size = 22, extra = '') {
