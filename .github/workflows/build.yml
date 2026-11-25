@@ -53,11 +53,10 @@ jobs:
         with:
           name: FoodDiary-APK
           path: FoodDiary.apk
+      # gh instead of a release action: uploads only the file, so a hiccup in other release calls can't fail the build
       - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: FoodDiary (latest build)
-          body: "אנדרואיד: מורידים את FoodDiary.apk ומתקינים בטלפון. אייפון: FoodDiary.ipa, מתקינים מהמחשב עם Sideloadly (הוראות ב-README)."
-          files: FoodDiary.apk
-          make_latest: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "FoodDiary (latest build)" --notes "אנדרואיד: FoodDiary.apk. מחשב (Windows): FoodDiary.exe." --latest
+          for i in 1 2 3; do gh release upload latest FoodDiary.apk --clobber && exit 0; sleep 15; done; exit 1

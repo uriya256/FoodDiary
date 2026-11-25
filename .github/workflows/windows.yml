@@ -39,8 +39,11 @@ jobs:
         with:
           name: FoodDiary-Windows
           path: FoodDiary.exe
+      # gh instead of a release action: uploads only the file
       - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          files: FoodDiary.exe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "FoodDiary (latest build)" --notes "אנדרואיד: FoodDiary.apk. מחשב (Windows): FoodDiary.exe." --latest
+          for i in 1 2 3; do gh release upload latest FoodDiary.exe --clobber && exit 0; sleep 15; done; exit 1
