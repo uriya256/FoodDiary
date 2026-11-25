@@ -130,7 +130,7 @@ function freshDb() {
       theme: 'auto', accent: '#2F7D4F', bg: 'sage', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false, motion: true,
       showWater: true, water: WATER_DEFAULTS(), reminder: { on: false, h: 21, m: 0 },
       showGym: true, gym: { rest: 90 },
-      lang: /^(he|iw)/i.test(navigator.language || 'he') ? 'he' : 'en',
+      lang: window.__TAURI__ || /^(he|iw)/i.test(navigator.language || 'he') ? 'he' : 'en', // the Windows app starts in Hebrew
     },
   };
 }

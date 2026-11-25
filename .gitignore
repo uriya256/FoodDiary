@@ -11,3 +11,5 @@ ios/Payload/
 ios/*.xcodeproj/
 ios/FoodDiary/Info.plist
 ios/build.log
+desktop/src-tauri/target/
+desktop/src-tauri/gen/

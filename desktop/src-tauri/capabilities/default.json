@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "The app's own window may call the app's commands (open the manufacturer's site, read its values).",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

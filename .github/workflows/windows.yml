@@ -1,0 +1,46 @@
+name: Build Windows app
+
+on:
+  push:
+    paths:
+      - 'app/src/main/assets/www/**'
+      - 'desktop/**'
+      - '.github/workflows/windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build FoodDiary.exe
+        working-directory: desktop
+        run: npx --yes @tauri-apps/cli@2 build --no-bundle
+      - name: Collect
+        shell: pwsh
+        run: |
+          Copy-Item desktop/src-tauri/target/release/fooddiary.exe FoodDiary.exe
+          Get-Item FoodDiary.exe | Select-Object Name, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FoodDiary-Windows
+          path: FoodDiary.exe
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          files: FoodDiary.exe

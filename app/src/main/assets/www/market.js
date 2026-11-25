@@ -70,13 +70,16 @@ function mktSearchUrl(site, q) {
   q = String(q).replace(/׳/g, "'").replace(/״/g, '"');
   return 'https://www.google.com/search?hl=' + (LANG === 'en' ? 'en' : 'iw') + '&q=' + encodeURIComponent(`site:${site} ${q}`.trim());
 }
+/** The Windows app (Tauri) opens the site in a second window with the same button. */
+const DESK = window.__TAURI__ && window.__TAURI__.core;
 function mktOpenWeb(url) {
   MKT.open = true;
   if (A && A.openWeb) A.openWeb(url, LANG, document.documentElement.classList.contains('dark'));
+  else if (DESK) DESK.invoke('open_web', { url, lang: LANG }).catch(e => toast(String(e)));
   else window.open(url, '_blank'); // while developing in a browser
 }
-function mktCloseWeb() { MKT.open = false; if (A && A.closeWeb) A.closeWeb(); }
-function mktMsg(t) { if (A && A.webMessage) A.webMessage(t); else toast(t); }
+function mktCloseWeb() { MKT.open = false; if (A && A.closeWeb) A.closeWeb(); else if (DESK) DESK.invoke('close_web').catch(() => { }); }
+function mktMsg(t) { if (A && A.webMessage) A.webMessage(t); else if (DESK) DESK.invoke('web_message', { text: t }).catch(() => toast(t)); else toast(t); }
 
 /** The browser in the app sends what it read from the page. */
 window.onWebValues = (s) => {
