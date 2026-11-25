@@ -11,19 +11,23 @@
   var NUM = /(\d+(?:[.,]\d+)?)/;
   var KCAL_AFTER = /(\d+(?:[.,]\d+)?)\s*(?:kcal|קק["״'׳]?ל|קלוריות|קילו[\s-]*קלוריות)/i;
   var KJ = /(קילו[\s-]*ג['׳]?(?:או|ו)ל|ק["״]?ג['׳]?|kj\b|kilojoule)/i;
+  // "סך השומנים", "סה"כ פחמימות", "חלבונים", ...: also with the article ה and slightly misread endings
   var LABELS = {
     k: /(^|[\s(|])(אנרג[א-ת]*|קלורי[א-ת]*|ערך\s*קלורי|energy|calories)/i,
-    p: /(^|[\s(|])(חלבו[א-ת]*|proteins?)(?![a-z])/i,
-    c: /(^|[\s(|])(סה["״]?כ\s*פחמי[א-ת]*|פחמי[א-ת]*|carbohydrates?|total\s*carb)/i,
-    f: /(^|[\s(|])(סה["״]?כ\s*שומנ[א-ת]*|שומנ[א-ת]*|שומן|total\s*fat|fats?)(?![a-z])/i,
+    p: /(^|[\s(|])(ה?חלבו[א-ת]*|proteins?)(?![a-z])/i,
+    c: /(^|[\s(|])((?:סה["״]?כ|סך)\s*ה?פחמי[א-ת]*|ה?פחמי[א-ת]*|carbohydrates?|total\s*carb)/i,
+    f: /(^|[\s(|])((?:סה["״]?כ|סך)\s*ה?שומנ[א-ת]*|ה?שומנ[א-ת]*|ה?שומן|total\s*fat|fats?)(?![a-z])/i,
   };
-  // lines about a part of the fat or the carbs ("of which saturated"), not the total
+  // lines about a part of the fat or the carbs ("saturated", "sugars"), not the total
   var NOT = {
     k: /^$/,
     p: /^$/,
-    c: /(מתוכ|סוכר|sugars|polyol|כהלים)/i,
-    f: /(רוו|טראנס|trans|saturat|כולסטרול|cholest|חומצות|מתוכ|בלתי|unsatur|of which)/i,
+    c: /(סוכר|sugars|polyol|כהלים)/i,
+    f: /(רוו|טראנס|trans|saturat|כולסטרול|cholest|חומצות|בלתי|unsatur)/i,
   };
+  // "of which ..." before the name: a part ("מתוכם שומן רווי"); after it ("סך השומנים, מתוכם:") the line is still the total
+  var PART = /(מתוכ|of which)/i;
+  function skip(key, line, m) { return NOT[key].test(line) || PART.test(line.slice(0, m.index + m[0].length)); }
   var SECTION = /(ערכים\s*תזונתיים|ערך\s*תזונתי|סימון\s*תזונתי|מידע\s*תזונתי|תכולה\s*תזונתית|nutrition(?:al)?\s*(?:facts|values|information|info)?)/i;
 
   function linesOf(text) {
@@ -67,11 +71,13 @@
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
       var m = line.match(LABELS[key]);
-      if (!m || NOT[key].test(line)) continue;
+      if (!m || skip(key, line, m)) continue;
       var end = m.index + m[0].length;
       var v = null;
       if (key === 'k') v = energy(line, end);
       else { var n = line.slice(end).match(NUM); if (n) v = num(n[1]); }
+      // the number before the name, on the same line: "579 אנרגיה (קלוריות)"
+      if (v == null) { var b = line.slice(0, m.index).match(/(\d+(?:[.,]\d+)?)\s*$/); if (b) v = num(b[1]); }
       // the number is in the next cell: "חלבונים" then "11"
       for (var j = 1; v == null && j <= 3 && i + j < lines.length; j++) {
         var nx = lines[i + j];
@@ -105,10 +111,11 @@
       else { var m = l.match(NUMLINE); if (m) nums.push(num(m[1])); }
     });
     if (rows.length < 3 || nums.length < rows.length) return a;
-    var o = { k: a.k, p: a.p, c: a.c, f: a.f };
+    var clean = nums.length === rows.length || nums.length === 2 * rows.length;
+    var o = clean ? {} : { k: a.k, p: a.p, c: a.c, f: a.f };
     ['k', 'p', 'c', 'f'].forEach(function (k) {
       if (o[k] != null) return;
-      for (var i = 0; i < rows.length; i++) if (LABELS[k].test(rows[i]) && !NOT[k].test(rows[i])) { o[k] = nums[i]; break; }
+      for (var i = 0; i < rows.length; i++) { var m = rows[i].match(LABELS[k]); if (m && !skip(k, rows[i], m)) { o[k] = nums[i]; break; } }
     });
     return o;
   }
@@ -116,7 +123,8 @@
   function fromText(text) {
     var t = String(text || '').replace(/[|]/g, ' ');
     var a = read(linesOf(t));
-    if (count(a) < 4) a = byColumns(section(linesOf(t)), a);
+    var b = byColumns(section(linesOf(t)), a);
+    if (count(b) >= count(a)) a = b;
     ['p', 'c', 'f'].forEach(function (k) { if (a[k] != null && (a[k] < 0 || a[k] > 100)) a[k] = null; });
     if (a.k != null && (a.k <= 0 || a.k >= 950)) a.k = null;
     var sv = t.match(/(גודל\s*(?:ה)?מנה|מנה\s*(?:של|=)|serving\s*size)[^\d\n]{0,20}(\d+(?:[.,]\d+)?)\s*(גרם|ג['׳]|g\b|מ["״]?ל|ml)/i);

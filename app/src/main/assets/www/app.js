@@ -1712,8 +1712,9 @@ window.setInsets = (top, bottom) => {
 };
 window.onSharedText = (text) => { while (sheetStack.length) closeSheet(); setTimeout(() => openImport(/\d{1,2}[\/.]\d{1,2}/.test(text) ? 'history' : 'day', text), 250); };
 window.onOcrStart = () => toast(tr('קורא את התמונה… זה יכול לקחת כמה שניות', 'Reading the photo… this can take a few seconds'));
-function startLens(source) {
+function startLens(source, forLabel) {
   if (!A || !A.photo) return;
+  IMP.lensFor = forLabel ? 'label' : '';
   // on iPhone reading the clipboard asks permission, so it is read only once something new was copied
   IMP.clipBefore = window.__IOS ? '' : (A.readClipboard ? A.readClipboard() : '');
   A.photo('lens', source);
@@ -1729,6 +1730,8 @@ function checkLensClipboard() {
     const c = window.__IOS ? (A.clipboardChanged && A.clipboardChanged() ? A.readClipboard() : '') : A.readClipboard();
     if (c && c.trim() && c !== IMP.clipBefore) {
       IMP.awaitClip = false;
+      // text of a nutrition label, copied in Lens for the product values
+      if (IMP.lensFor === 'label') { IMP.lensFor = ''; IMP.checking = false; window.onLabelText(c, 'ok', 'lens'); return; }
       if (!sheetStack.find(s => s.id === 'import')) openImport(IMP.mode || 'day');
       setImportText(c, true);
       toast(tr('הטקסט מ-Lens נכנס. בדוק ותקן לפני הניתוח', 'Text from Lens pasted. Check and fix it before reading it in'));
