@@ -628,3 +628,8 @@ html.dark .mk.ok { color: #7DDBA6; } html.dark .mk.lo, html.dark .mk.hi { color:
 .eprod .grow svg, .s svg, .muted svg { vertical-align: -2px; }
 .chkrow { gap: 10px; align-items: flex-start; padding: 6px 0; }
 .chkrow input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; accent-color: var(--accent, currentColor); }
+
+.mktphoto { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.rawocr { white-space: pre-wrap; font: 12.5px/1.45 ui-monospace, monospace; background: rgba(0,0,0,.04); border-radius: 10px; padding: 8px; max-height: 180px; overflow: auto; margin: 6px 0 0; }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; flex: none; opacity: .7; }
+@keyframes spin { to { transform: rotate(360deg); } }

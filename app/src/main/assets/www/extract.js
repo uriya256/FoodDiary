@@ -3,6 +3,8 @@
  * usually the manufacturer's product page. The app runs this inside that page when you tap
  * "use the values on this page"; it returns JSON text:
  * { ok, k, p, c, f, g, name, host, url }  (ok = all four values were found; g = serving size in grams, if written).
+ * Loaded in the app itself (window.__FD_LABEL_API set first), it only adds window.FDLabel.fromText(text),
+ * which reads the same values from the text of a photographed label.
  */
 (function () {
   function num(s) { return parseFloat(String(s).replace(',', '.')); }
@@ -10,10 +12,10 @@
   var KCAL_AFTER = /(\d+(?:[.,]\d+)?)\s*(?:kcal|קק["״'׳]?ל|קלוריות|קילו[\s-]*קלוריות)/i;
   var KJ = /(קילו[\s-]*ג['׳]?(?:או|ו)ל|ק["״]?ג['׳]?|kj\b|kilojoule)/i;
   var LABELS = {
-    k: /(^|[\s(])(אנרגיה|קלוריות|ערך\s*קלורי|energy|calories)/i,
-    p: /(^|[\s(])(חלבונים|חלבון|proteins?)(?![a-z])/i,
-    c: /(^|[\s(])(סה["״]?כ\s*פחמימות|פחמימות|carbohydrates?|total\s*carb)/i,
-    f: /(^|[\s(])(סה["״]?כ\s*שומנים|שומנים|שומן|total\s*fat|fats?)(?![a-z])/i,
+    k: /(^|[\s(|])(אנרג[א-ת]*|קלורי[א-ת]*|ערך\s*קלורי|energy|calories)/i,
+    p: /(^|[\s(|])(חלבו[א-ת]*|proteins?)(?![a-z])/i,
+    c: /(^|[\s(|])(סה["״]?כ\s*פחמי[א-ת]*|פחמי[א-ת]*|carbohydrates?|total\s*carb)/i,
+    f: /(^|[\s(|])(סה["״]?כ\s*שומנ[א-ת]*|שומנ[א-ת]*|שומן|total\s*fat|fats?)(?![a-z])/i,
   };
   // lines about a part of the fat or the carbs ("of which saturated"), not the total
   var NOT = {
@@ -91,6 +93,19 @@
     return o.k != null && o.k > 0 && o.k < 950 && ['p', 'c', 'f'].every(function (k) { return o[k] != null && o[k] >= 0 && o[k] <= 100; });
   }
   function count(o) { return ['k', 'p', 'c', 'f'].filter(function (k) { return o[k] != null; }).length; }
+
+  /** Values from plain text (a photographed label read by OCR). */
+  function fromText(text) {
+    var t = String(text || '').replace(/[|]/g, ' ');
+    var a = read(linesOf(t));
+    ['p', 'c', 'f'].forEach(function (k) { if (a[k] != null && (a[k] < 0 || a[k] > 100)) a[k] = null; });
+    if (a.k != null && (a.k <= 0 || a.k >= 950)) a.k = null;
+    var sv = t.match(/(גודל\s*(?:ה)?מנה|מנה\s*(?:של|=)|serving\s*size)[^\d\n]{0,20}(\d+(?:[.,]\d+)?)\s*(גרם|ג['׳]|g\b|מ["״]?ל|ml)/i);
+    a.g = sv ? num(sv[2]) : null;
+    a.ok = good(a);
+    return a;
+  }
+  if (typeof window !== 'undefined' && window.__FD_LABEL_API) { window.FDLabel = { fromText: fromText }; return ''; }
 
   try {
     var a = read(linesOf(document.body ? document.body.innerText : ''));

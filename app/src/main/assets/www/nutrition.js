@@ -223,7 +223,7 @@ function nutEditHtml() {
   const field = (k, label) => `<label class="field grow"><span>${label}</span><input class="gnum" type="number" inputmode="decimal" min="0" step="any" data-nut="${k}" value="${cur.src ? v(cur[k]) : ''}"></label>`;
   return sheetHead(esc(r.name)) + `<div class="body">
     <div class="small muted">${srcTxt}</div>
-    <button class="btn block" data-act="openMarket" data-name="${esc(r.name)}" data-from="nut">${icon('globe', 18)}${ux && ux.prod ? tr('החלפת המוצר', 'Change the product') : tr('מוצר מאתר היצרן', "Product from the maker's site")}</button>
+    <button class="btn block" data-act="openMarket" data-name="${esc(r.name)}" data-from="nut">${icon('globe', 18)}${ux && ux.prod ? tr('החלפת המוצר', 'Change the product') : tr('ערכים מאתר היצרן או מהתווית', 'Values from the maker or the label')}</button>
     <div class="seg">${[['100', tr('ל-100 גרם', 'Per 100 g')], ['serv', gk === 'piece' ? tr('ליחידה אחת', 'Per piece') : tr('למנה', 'Per serving')]].map(([m, l]) => `<button data-act="nutMode" data-v="${m}" aria-pressed="${NUTED.mode === m}">${l}</button>`).join('')}</div>
     <label class="field"><span>${gk === 'piece' ? tr('משקל יחידה אחת (גרם)', 'Weight of one piece (g)') : tr('משקל מנה (גרם)', 'Serving weight (g)')}</span><input class="gnum" type="number" inputmode="decimal" min="1" step="any" data-nut="g" value="${Math.round(g * 10) / 10}"></label>
     ${field('k', tr('קלוריות', 'Calories'))}

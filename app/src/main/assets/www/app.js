@@ -1695,6 +1695,7 @@ document.addEventListener('submit', (e) => {
 });
 Object.assign(ACT, AI_ACT, GYM_ACT, NUT_ACT, WT_ACT, CL_ACT, MKT_ACT);
 Object.assign(ON, AI_ON, GYM_ON, NUT_ON, WT_ON, CL_ON, MKT_ON);
+Object.assign(FILE_ON, MKT_FILE_ON);
 $('#datePicker').addEventListener('change', (e) => { if (e.target.value) setDate(e.target.value); });
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (db.settings.theme === 'auto') applyTheme(); });
 

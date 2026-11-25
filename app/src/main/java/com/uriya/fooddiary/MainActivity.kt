@@ -31,6 +31,9 @@ import android.content.ClipData
 import android.content.ActivityNotFoundException
 import android.content.Context
 import java.io.File
+import java.io.ByteArrayOutputStream
+import android.util.Base64
+import android.graphics.Bitmap
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -72,18 +75,25 @@ class MainActivity : ComponentActivity() {
 
     // ---------- photo of a written note -> text ----------
     private var photoUri: Uri? = null
-    private var photoMode = "ocr" // "ocr" = read it here offline, "lens" = send the photo to Google Lens
+    private var photoMode = "ocr" // "ocr" = read it here offline, "lens" = send the photo to Google Lens, "label" = a nutrition label
+    private var labelUri: Uri? = null
+    /** Who hears about a cancelled or failed photo. */
+    private fun photoCb() = if (photoMode == "label") "onLabelPhoto" else "onOcrText"
 
     private val takePhoto = registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val u = photoUri
-        if (ok && u != null) gotPhoto(u) else js("window.onOcrText && window.onOcrText(null, 'cancel')")
+        if (ok && u != null) gotPhoto(u) else js("window.${photoCb()} && window.${photoCb()}(null, 'cancel')")
     }
     private val pickPhoto = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) gotPhoto(uri) else js("window.onOcrText && window.onOcrText(null, 'cancel')")
+        if (uri != null) gotPhoto(uri) else js("window.${photoCb()} && window.${photoCb()}(null, 'cancel')")
     }
 
     private fun gotPhoto(uri: Uri) {
-        if (photoMode == "lens") sendToLens(uri) else ocrFrom(uri)
+        when (photoMode) {
+            "lens" -> sendToLens(uri)
+            "label" -> labelPhoto(uri)
+            else -> ocrFrom(uri)
+        }
     }
 
     private fun newPhotoUri(): Uri {
@@ -101,9 +111,41 @@ class MainActivity : ComponentActivity() {
                 if (source == "gallery") pickPhoto.launch("image/*")
                 else { val u = newPhotoUri(); photoUri = u; takePhoto.launch(u) }
             } catch (e: Exception) {
-                js("window.onOcrText && window.onOcrText(null, 'nocamera', " + JSONObject.quote(e.toString()) + ")")
+                js("window.${photoCb()} && window.${photoCb()}(null, 'nocamera', " + JSONObject.quote(e.toString()) + ")")
             }
         }
+    }
+
+    /** A photo of a nutrition label: the page gets it as a JPEG (for Gemini) and can ask for it to be read here (labelOcr). */
+    private fun labelPhoto(uri: Uri) {
+        labelUri = uri
+        Thread {
+            val b64 = try {
+                val bmp = Ocr.loadBitmap(this, uri, 1600)
+                if (bmp == null) null else {
+                    val out = ByteArrayOutputStream()
+                    bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                    Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+                }
+            } catch (e: Throwable) { null }
+            if (b64 == null) js("window.onLabelPhoto && window.onLabelPhoto(null, 'error', 'image')")
+            else js("window.onLabelPhoto && window.onLabelPhoto(" + JSONObject.quote(b64) + ", 'ok')")
+        }.start()
+    }
+
+    /** Reads the last label photo offline; the text goes to window.onLabelText. */
+    fun labelOcr() {
+        val uri = labelUri
+        if (uri == null) { js("window.onLabelText && window.onLabelText(null, 'error', 'image')"); return }
+        Thread {
+            var err: String? = null
+            val result = try {
+                val bmp = Ocr.loadBitmap(this, uri)
+                if (bmp == null) { err = "image"; null } else Ocr.recognize(this, bmp).also { if (it == null) err = "data" }
+            } catch (e: Throwable) { err = e.toString(); null }
+            if (result == null) js("window.onLabelText && window.onLabelText(null, 'error', " + JSONObject.quote(err ?: "") + ")")
+            else js("window.onLabelText && window.onLabelText(" + JSONObject.quote(result) + ", 'ok')")
+        }.start()
     }
 
     fun ocrCamera() = photo("ocr", "camera")

@@ -41,13 +41,13 @@ function prodLabel(p) { return esc(p.n || '') + (p.b ? ` · ${esc(p.b)}` : ''); 
 /* ---------- the sheet ---------- */
 /** from: 'edit' (the item being edited) or 'nut' (the food's values); said = the words the user wrote. */
 function openMarket(food, from, said) {
-  MKT.food = food; MKT.from = from; MKT.step = 'search'; MKT.vals = null; MKT.always = true; MKT.other = '';
+  MKT.food = food; MKT.from = from; MKT.step = 'search'; MKT.vals = null; MKT.always = true; MKT.other = ''; MKT.reading = '';
   MKT.q = said || (LANG === 'en' && NU.NUT_EN[food]) || food;
   MKT.site = mktSet().site || MKT_SITES[0].site;
-  openSheet('market', mktHtml(), { title: tr('מוצר מאתר היצרן', "Product from the maker's site"), full: true, onClose: () => { if (MKT.open) mktCloseWeb(); } });
+  openSheet('market', mktHtml(), { title: tr('ערכים של המוצר', 'Product values'), full: true, onClose: () => { if (MKT.open) mktCloseWeb(); } });
 }
 function mktHtml() {
-  const head = sheetHead(tr('מוצר מאתר היצרן', "Product from the maker's site"));
+  const head = sheetHead(tr('ערכים של המוצר', 'Product values'));
   return head + (MKT.step === 'confirm' ? mktConfirmHtml() : mktSearchHtml());
 }
 function mktSearchHtml() {
@@ -55,6 +55,7 @@ function mktSearchHtml() {
   const other = MKT.site === '*';
   return `<div class="body">
     <div class="small muted">${tr(`בשביל: ${esc(MKT.food)}`, `For: ${esc(MKT.food)}`)}</div>
+    <div class="section-t" style="margin:0">${icon('globe', 16)} ${tr('מאתר היצרן', "From the maker's site")}</div>
     <label class="field"><span>${tr('שם המוצר', 'Product name')}</span><input type="search" data-on="mktQ" value="${esc(MKT.q)}" placeholder="${tr('למשל: קוטג׳ 5%', 'e.g. cottage cheese 5%')}" autocomplete="off" enterkeyhint="search"></label>
     <div class="field"><span>${tr('החברה', 'Company')}</span>
       <div class="chips" style="margin-top:2px">${sites.map(s => `<button class="chip${MKT.site === s.site ? ' sel' : ''}" data-act="mktSite" data-v="${esc(s.site)}" aria-pressed="${MKT.site === s.site}">${esc(tr(s.he, s.en))}</button>`).join('')}<button class="chip${other ? ' sel' : ''}" data-act="mktSite" data-v="*" aria-pressed="${other}">${tr('חברה אחרת', 'Another company')}</button></div>
@@ -62,8 +63,100 @@ function mktSearchHtml() {
     ${other ? `<label class="field"><span>${tr('כתובת האתר של החברה', "The company's website")}</span><input type="url" dir="ltr" data-on="mktOther" value="${esc(MKT.other)}" placeholder="berman.co.il" autocomplete="off" inputmode="url"></label>` : ''}
     <button class="btn primary big block" data-act="mktGo">${icon('globe', 18)}${other ? tr('חיפוש באתר החברה', "Search the company's site") : tr(`חיפוש באתר של ${esc(mktSiteName(MKT.site))}`, `Search ${esc(mktSiteName(MKT.site))}'s site`)}</button>
     <p class="small muted" style="margin:0">${tr('האתר של החברה ייפתח בתוך האפליקציה, רק עם תוצאות מהאתר שלה. פותחים את דף המוצר ולוחצים למטה על "קח את הערכים מהדף". לפני השמירה תוכל לבדוק את המספרים.', "The company's site opens inside the app, with results from that site only. Open the product's page and tap \"Use the values on this page\" at the bottom. You can check the numbers before saving.")}</p>
+    ${mktPhotoHtml()}
     <button class="linkbtn" data-act="mktManual">${tr('או להקליד את הערכים מהתווית', 'Or type the values from the label')}</button>
   </div>`;
+}
+/** Photograph the label, or pick a photo of it you already have. */
+function mktPhotoHtml() {
+  const phone = !!(A && A.photo);
+  const gem = !!aiSet().key;
+  if (MKT.reading) return `<div class="mktphoto"><div class="row" style="gap:10px"><span class="spin"></span><span class="grow">${esc(MKT.reading)}</span></div></div>`;
+  return `<div class="mktphoto">
+    <div class="section-t" style="margin:0">${icon('camera', 16)} ${tr('או מצילום של התווית', 'Or from a photo of the label')}</div>
+    <div class="row" style="gap:8px">
+      ${phone ? `<button class="btn grow" data-act="mktCam">${icon('camera', 18)}${tr('צילום', 'Camera')}</button>` : ''}
+      <button class="btn grow" data-act="mktGal">${icon('image', 18)}${phone ? tr('מתמונה קיימת', 'From a photo') : tr('בחירת תמונה', 'Choose a photo')}</button>
+    </div>
+    <input type="file" accept="image/*" id="mktFile" data-on="mktFile" hidden>
+    <div class="small muted">${gem ? tr('Gemini קורא את טבלת הערכים מהתמונה (צריך אינטרנט).', 'Gemini reads the nutrition table from the photo (needs internet).') + (phone ? tr(' בלי רשת, הזיהוי נעשה בטלפון.', ' Without a connection the phone reads it.') : '') : phone ? tr('הזיהוי נעשה בטלפון, בלי אינטרנט. צלם רק את טבלת הערכים, ישר ובאור טוב. עם מפתח Gemini (בצ׳אט) הקריאה מדויקת יותר.', 'The phone reads it, offline. Photograph just the nutrition table, straight and in good light. With a Gemini key (in the chat) reading is more accurate.') : tr('במחשב, קריאה של תמונה צריכה מפתח Gemini (מגדירים בצ׳אט). בטלפון זה עובד גם בלי.', 'On the computer, reading a photo needs a Gemini key (set it up in the chat). On the phone it works without one.')}</div>
+  </div>`;
+}
+const LABEL_PROMPT = 'This photo shows a food product\'s nutrition label, usually in Hebrew ("ערכים תזונתיים"). ' +
+  'Read the column for 100 g (or 100 ml), not the one for a serving. Reply with JSON only: ' +
+  '{"name": product name if it is visible, else "", "k": energy in kcal (convert from kJ if only kJ is given), "p": protein g, "c": total carbohydrates g, "f": total fat g, "g": serving size in grams if written, else null}. ' +
+  'Use null for anything you cannot read clearly. Do not guess.';
+function mktReading(t) { MKT.reading = t; if (MKT.step === 'search') replaceSheetBody('market', mktHtml()); }
+/** A photo of the label arrived (base64 JPEG): Gemini if there is a key, else (or if it fails) the phone's own reader. */
+window.onLabelPhoto = (b64, status, detail) => {
+  if (status === 'cancel') return;
+  if (!b64) {
+    toast(status === 'nocamera' ? tr('לא הצלחתי לפתוח את המצלמה', "Couldn't open the camera") : tr('לא הצלחתי לפתוח את התמונה', "Couldn't open the photo"));
+    return;
+  }
+  const offline = () => {
+    if (A && A.labelOcr) { mktReading(tr('קורא את התמונה בטלפון…', 'Reading the photo on the phone…')); A.labelOcr(); return true; }
+    return false;
+  };
+  if (!aiSet().key) {
+    if (!offline()) toast(tr('כדי לקרוא תמונה במחשב צריך מפתח Gemini (מגדירים בצ׳אט)', 'Reading a photo on the computer needs a Gemini key (set it up in the chat)'));
+    return;
+  }
+  mktReading(tr('Gemini קורא את הערכים מהתמונה…', 'Gemini is reading the values…'));
+  const s = aiSet(), model = s.model || 'gemini-flash-latest';
+  const body = {
+    contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/jpeg', data: b64 } }, { text: LABEL_PROMPT }] }],
+    generationConfig: Object.assign(aiGenCfg(model, (s.think || {})[model] ? 1 : 0), { responseMimeType: 'application/json' }),
+  };
+  let out = '';
+  const fail = () => { if (!offline()) { mktReading(''); toast(tr('לא הצלחתי לקרוא את הערכים מהתמונה. אפשר להקליד אותם.', "Couldn't read the values from the photo. You can type them.")); } };
+  aiStream(model, body, {
+    chunk(t) { out += t; },
+    blocked() { },
+    truncated() { },
+    done() {
+      let v = null;
+      try { v = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1)); } catch (e) { v = null; }
+      const vals = v && { k: mktNum(v.k), p: mktNum(v.p), c: mktNum(v.c), f: mktNum(v.f), g: mktNum(v.g), name: typeof v.name === 'string' ? v.name : '' };
+      if (vals && ['k', 'p', 'c', 'f'].filter(k => vals[k] != null).length >= 2) mktGotLabel(vals, 'gemini', '');
+      else fail();
+    },
+    error() { fail(); },
+  });
+};
+function mktNum(x) { const v = parseFloat(String(x == null ? '' : x).replace(',', '.')); return isFinite(v) && v >= 0 ? v : null; }
+/** The phone read the photo's text offline. */
+window.onLabelText = (text, status, detail) => {
+  if (text == null) {
+    mktReading('');
+    toast(detail === 'data' ? tr('קובצי הזיהוי חסרים באפליקציה', 'Recognition files are missing in the app') : tr('לא הצלחתי לקרוא את התמונה', "Couldn't read the photo"));
+    return;
+  }
+  const a = window.FDLabel ? window.FDLabel.fromText(text) : {};
+  mktGotLabel(a, 'ocr', text);
+};
+function mktGotLabel(v, how, raw) {
+  MKT.reading = '';
+  const have = ['k', 'p', 'c', 'f'].filter(k => v[k] != null).length;
+  MKT.vals = { n: v.name || MKT.q, b: '', site: '', url: '', k: v.k, p: v.p, c: v.c, f: v.f, g: v.g || null, missing: 4 - have, how, raw: raw || '' };
+  MKT.step = 'confirm';
+  replaceSheetBody('market', mktHtml());
+}
+/** A photo chosen in the browser / the Windows app: made smaller, then read like the phone's. */
+function mktReadFile(file) {
+  if (!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const max = 1600, sc = Math.min(1, max / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    URL.revokeObjectURL(url);
+    window.onLabelPhoto(cv.toDataURL('image/jpeg', 0.85).split(',')[1], 'ok');
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); window.onLabelPhoto(null, 'error'); };
+  img.src = url;
 }
 /** Google, limited to the company's site. */
 function mktSearchUrl(site, q) {
@@ -109,7 +202,9 @@ function mktConfirmHtml() {
   const fromEdit = MKT.from === 'edit' && EDIT.it;
   const field = (k, label, grow = ' grow') => `<label class="field${grow}"><span>${label}</span><input class="gnum" type="number" inputmode="decimal" min="0" step="any" data-on="mktVal" data-k="${k}" value="${v[k] == null ? '' : v[k]}"></label>`;
   return `<div class="body">
-    ${v.missing ? `<div class="small warn-t">${tr('לא מצאתי בדף את כל הערכים. השלם את החסר מהתווית.', "Not every value was on the page. Fill in what's missing from the label.")}</div>` : v.url ? `<div class="small muted">${tr(`הערכים נקראו מהאתר ${esc(v.site)}. כדאי לוודא שהם ל-100 גרם.`, `Values read from ${esc(v.site)}. Check that they are per 100 g.`)}</div>` : ''}
+    ${v.how ? `<div class="small ${v.missing ? 'warn-t' : 'muted'}">${v.missing === 4 ? tr('לא מצאתי ערכים בתמונה. אפשר להקליד אותם, או לצלם שוב רק את הטבלה, ישר ובאור טוב.', "I couldn't find values in the photo. Type them, or photograph just the table again, straight and in good light.") : (v.how === 'gemini' ? tr('הערכים נקראו מהתמונה עם Gemini.', 'Values read from the photo with Gemini.') : tr('הערכים נקראו מהתמונה בטלפון.', 'Values read from the photo on the phone.')) + ' ' + (v.missing ? tr('חלק חסרים, השלם אותם מהתווית.', 'Some are missing; fill them in from the label.') : tr('בדוק שהם כמו בתווית, בעמודה של 100 גרם.', 'Check they match the label, in the 100 g column.'))}</div>
+    ${v.raw ? `<details class="small"><summary>${tr('הטקסט שזוהה בתמונה', 'Text found in the photo')}</summary><pre class="rawocr">${esc(v.raw)}</pre></details>` : ''}`
+    : v.missing ? `<div class="small warn-t">${tr('לא מצאתי בדף את כל הערכים. השלם את החסר מהתווית.', "Not every value was on the page. Fill in what's missing from the label.")}</div>` : v.url ? `<div class="small muted">${tr(`הערכים נקראו מהאתר ${esc(v.site)}. כדאי לוודא שהם ל-100 גרם.`, `Values read from ${esc(v.site)}. Check that they are per 100 g.`)}</div>` : ''}
     <label class="field"><span>${tr('שם המוצר', 'Product name')}</span><input type="text" data-on="mktVal" data-k="n" value="${esc(v.n || '')}"></label>
     <div class="small muted" style="margin-bottom:-4px">${tr('ל-100 גרם', 'Per 100 g')}</div>
     ${field('k', tr('קלוריות', 'Calories'), '')}
@@ -149,7 +244,7 @@ function editProdHtml() {
   return `<div id="eProd" class="eprod">${p ? `<span class="grow small">${icon('globe', 15)} ${prodLabel(p)}${p.only ? '' : ` <span class="muted">(${tr('תמיד', 'always')})</span>`}</span>
       ${open(tr('החלפה', 'Change'), '')}
       ${p.only ? `<button class="iconbtn plain" data-act="eProdOff" aria-label="${tr('בלי המוצר', 'Without the product')}">${icon('x', 18)}</button>` : ''}`
-    : open(`${icon('globe', 18)}${tr('מוצר מאתר היצרן', "Product from the maker's site")}`, ' block')}</div>`;
+    : open(`${icon('globe', 18)}${tr('ערכים מאתר היצרן או מהתווית', 'Values from the maker or the label')}`, ' block')}</div>`;
 }
 
 const MKT_ACT = {
@@ -170,8 +265,10 @@ const MKT_ACT = {
     mktOpenWeb(mktSearchUrl(site, q));
     replaceSheetBody('market', mktHtml());
   },
+  mktCam() { if (A && A.photo) A.photo('label', 'camera'); else { const f = $('#mktFile'); if (f) { f.setAttribute('capture', 'environment'); f.click(); } } },
+  mktGal() { if (A && A.photo) A.photo('label', 'gallery'); else { const f = $('#mktFile'); if (f) { f.removeAttribute('capture'); f.click(); } } },
   mktManual() { MKT.vals = { n: MKT.q, b: '', site: '', url: '', k: null, p: null, c: null, f: null, g: null, missing: 0 }; MKT.step = 'confirm'; replaceSheetBody('market', mktHtml()); },
-  mktAgain() { MKT.step = 'search'; replaceSheetBody('market', mktHtml()); },
+  mktAgain() { MKT.step = 'search'; MKT.reading = ''; replaceSheetBody('market', mktHtml()); },
   mktUse() {
     const prod = mktProd();
     if (!(prod.k > 0)) { toast(tr('חסרות קלוריות', 'Calories are missing')); return; }
@@ -202,4 +299,7 @@ const MKT_ON = {
     const b = $('#mktNow'); if (b) b.innerHTML = mktNowHtml();
   },
   mktAlways(el) { MKT.always = el.checked; },
+};
+const MKT_FILE_ON = {
+  mktFile(el) { const f = el.files && el.files[0]; el.value = ''; mktReadFile(f); },
 };
