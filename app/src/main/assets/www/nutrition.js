@@ -48,7 +48,8 @@ function targetLineHtml() {
  * The Ministry of Health check for a day (or a daily average): grams and share of each macro against the ranges,
  * the ranges in grams for the calorie goal (or for what was eaten), and the protein minimum by body weight.
  */
-function mohHtml(t, avg) {
+function mohHtml(t, avg, when) {
+  const col = avg ? tr('ממוצע ליום', 'Daily average') : when || tr('היום', 'Today');
   const n = nutSet();
   const pct = NU.macroPct(t);
   if (!pct) return '';
@@ -62,12 +63,12 @@ function mohHtml(t, avg) {
   if (kg) {
     const min = Math.round(kg * NU.MOH.proteinPerKg);
     const st = t.p >= min ? 'ok' : 'lo';
-    prot = tr(`חלבון: לפחות ${NU.MOH.proteinPerKg} ג׳ לכל ק״ג משקל, כלומר כ-${min} ג׳ ביום למשקל ${fmtKg(kg)} ק״ג. ${avg ? 'בממוצע' : 'היום'}: ${gr(t.p)} ג׳`, `Protein: at least ${NU.MOH.proteinPerKg} g per kg of body weight, about ${min} g a day at ${fmtKg(kg)} kg. ${avg ? 'Average' : 'Today'}: ${gr(t.p)} g`) + mark(st);
+    prot = tr(`חלבון: לפחות ${NU.MOH.proteinPerKg} ג׳ לכל ק״ג משקל, כלומר כ-${min} ג׳ ביום למשקל ${fmtKg(kg)} ק״ג. ${col}: ${gr(t.p)} ג׳`, `Protein: at least ${NU.MOH.proteinPerKg} g per kg of body weight, about ${min} g a day at ${fmtKg(kg)} kg. ${col}: ${gr(t.p)} g`) + mark(st);
   } else prot = `${tr(`חלבון: מומלץ לפחות ${NU.MOH.proteinPerKg} ג׳ לכל ק״ג משקל גוף.`, `Protein: at least ${NU.MOH.proteinPerKg} g per kg of body weight.`)} <button class="linkbtn" data-act="openWeight">${tr('רישום משקל יחשב את זה בשבילך', 'Log your weight to work it out')}</button>`;
   return `<div class="mohbox">
     <div class="section-t" style="margin:0 0 4px">${tr('לפי המלצת משרד הבריאות', 'Ministry of Health recommendation')}</div>
-    <table class="mohtbl"><thead><tr><th></th><th>${avg ? tr('ממוצע ליום', 'Daily average') : tr('היום', 'Today')}</th><th>${tr('מומלץ', 'Range')}</th><th>${n.goal ? tr(`ליעד ${kc(base)}`, `For ${kc(base)}`) : tr('בגרמים', 'In grams')}</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="small muted" style="margin-top:6px">${n.goal ? tr(`הגרמים מחושבים לפי היעד היומי שלך, ${kc(base)} קק״ל.`, `Grams are worked out for your daily goal of ${kc(base)} kcal.`) : tr(`הגרמים מחושבים לפי ${kc(base)} קק״ל, ${avg ? 'הממוצע ליום' : 'מה שנאכל היום'}. עם יעד קלורי הם יחושבו לפי היעד.`, `Grams are worked out for ${kc(base)} kcal, ${avg ? 'the daily average' : 'what was eaten today'}. With a calorie goal they follow the goal.`)}</div>
+    <table class="mohtbl"><thead><tr><th></th><th>${col}</th><th>${tr('מומלץ', 'Range')}</th><th>${n.goal ? tr(`ליעד ${kc(base)}`, `For ${kc(base)}`) : tr('בגרמים', 'In grams')}</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="small muted" style="margin-top:6px">${n.goal ? tr(`הגרמים מחושבים לפי היעד היומי שלך, ${kc(base)} קק״ל.`, `Grams are worked out for your daily goal of ${kc(base)} kcal.`) : tr(`הגרמים מחושבים לפי ${kc(base)} קק״ל, ${avg ? 'הממוצע ליום' : 'מה שנאכל ביום הזה'}. עם יעד קלורי הם יחושבו לפי היעד.`, `Grams are worked out for ${kc(base)} kcal, ${avg ? 'the daily average' : 'what was eaten that day'}. With a calorie goal they follow the goal.`)}</div>
     <div class="small" style="margin-top:6px">${prot}</div>
     <div class="small muted" style="margin-top:6px">${tr('משרד הבריאות קובע את הכמויות של רכיבי התזונה לפי טבלאות ה-DRI. קשת המזון עצמה ממליצה על סוגי המזון ועל התדירות: הרבה ירקות, פירות, דגנים מלאים וקטניות, ומעט מזון מעובד.', 'The Ministry of Health sets nutrient amounts by the DRI tables. The food rainbow itself recommends which foods and how often: plenty of vegetables, fruit, whole grains and legumes, and little processed food.')}</div>
   </div>`;
@@ -128,6 +129,38 @@ function balanceBadge(t) {
   if (b.low) parts.push(tr(`מעט ${MACRO[b.low].he}`, `low ${MACRO[b.low].en.toLowerCase()}`));
   return `<span class="bal ${b.level}">${parts.join(tr(', ', ', ')) || tr('כמעט מאוזן', 'Almost balanced')}</span>`;
 }
+/** Today is still going until dinner is written: the split is judged only for a finished day. */
+function dayInProgress(iso) {
+  const today = todayISO();
+  if (iso !== today) return iso > today;
+  const d = db.days[iso];
+  return !(d && d.meals && d.meals.dinner && d.meals.dinner.length);
+}
+const MORE_EX = {
+  c: ['לחם, אורז, פסטה או פירות', 'bread, rice, pasta or fruit'],
+  p: ['עוף, דגים, ביצים, קטניות או גבינה', 'chicken, fish, eggs, legumes or cheese'],
+  f: ['טחינה, אבוקדו, אגוזים או שמן זית', 'tahini, avocado, nuts or olive oil'],
+};
+/**
+ * The balance of a whole day. A finished day gets a verdict; today, while it is still going,
+ * gets what the rest of the day could use instead ("more carbs, less fat").
+ */
+function dayBalance(t, iso) {
+  const b = bal(NU.macroPct(t));
+  if (!b) return { badge: '', hint: '' };
+  if (!dayInProgress(iso)) return { badge: balanceBadge(t), hint: '' };
+  if (b.level === 'ok') return { badge: `<span class="bal ok">${icon('check', 13)}${tr('מאוזן עד עכשיו', 'Balanced so far')}</span>`, hint: '' };
+  const soft = `<span class="bal soft">${tr('עד עכשיו', 'So far')}</span>`;
+  const lim = isMoh() ? 0 : 10;
+  const ks = ['c', 'p', 'f'];
+  const more = ks.filter(k => b.d[k] < -lim).sort((x, y) => b.d[x] - b.d[y]);
+  const less = ks.filter(k => b.d[k] > lim).sort((x, y) => b.d[y] - b.d[x]);
+  if (!more.length && !less.length) return { badge: soft, hint: '' };
+  const parts = more.map(k => tr(`יותר ${MACRO[k].he}`, `more ${MACRO[k].en.toLowerCase()}`))
+    .concat(less.map(k => tr(`פחות ${MACRO[k].he}`, `less ${MACRO[k].en.toLowerCase()}`)));
+  const ex = more.length ? tr(` (למשל ${MORE_EX[more[0]][0]})`, ` (e.g. ${MORE_EX[more[0]][1]})`) : '';
+  return { badge: soft, hint: `<div class="small nut-hint">${tr('להמשך היום', 'For the rest of the day')}: ${parts.join(', ')}${ex}</div>` };
+}
 function ringSvg(frac, size) {
   const r = 42, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, frac));
   const over = frac > 1.05;
@@ -160,9 +193,12 @@ function nutDayCardHtml(iso) {
         ${goal ? `<span class="small ${t.k > goal * 1.05 ? 'warn-t' : 'muted'}">${t.k <= goal ? tr(`נשארו ${kc(goal - t.k)} קק״ל`, `${kc(goal - t.k)} kcal left`) : tr(`${kc(t.k - goal)} קק״ל מעל היעד`, `${kc(t.k - goal)} kcal over goal`)}</span>` : `<span class="small muted">${tr('קק״ל משוער היום', 'estimated kcal today')}</span>`}
       </span>
     </button>`;
-  if (pct) h += `${macroBar(t, { big: true, ticks: true })}
-    <div class="row between nut-leg"><span class="small">${legendHtml(pct)}</span>${balanceBadge(t)}</div>
-    ${targetLineHtml()}`;
+  if (pct) {
+    const db_ = dayBalance(t, iso);
+    h += `${macroBar(t, { big: true, ticks: true })}
+    <div class="row between nut-leg"><span class="small">${legendHtml(pct)}</span>${db_.badge}</div>
+    ${db_.hint}${targetLineHtml()}`;
+  }
   const notes = [];
   if (wg) notes.push(`<span class="${wk > wg * 1.05 ? 'warn-t' : ''}">${tr(`השבוע: ${kc(wk)} מתוך ${kc(wg)} קק״ל`, `This week: ${kc(wk)} of ${kc(wg)} kcal`)}</span>`);
   if (t.guess || t.unknown) notes.push(`<button class="linkbtn" data-act="openNutDay">${t.unknown ? tr(`${t.unknown} בלי ערכים`, `${t.unknown} without values`) : tr(`${t.guess} לפי הערכה גסה`, `${t.guess} roughly guessed`)}</button>`);
@@ -170,12 +206,15 @@ function nutDayCardHtml(iso) {
   if (notes.length) h += `<div class="small muted nut-notes">${notes.join(' · ')}</div>`;
   return h + `</section>`;
 }
-/** The line under a meal's chips: calories, the macro split bar and a balance badge. */
+/**
+ * The line under a meal's chips: how its calories split. No verdict: the recommended split is for the whole day,
+ * and a good meal (eggs and a slice of bread for breakfast) can be far from it on its own.
+ */
 function mealNutHtml(items) {
   if (!nutOn() || !items || !items.length) return '';
   const t = mealN(items);
   if (t.k < 1) return '';
-  return `<div class="mealnut">${macroBar(t)}${balanceBadge(t)}</div>`;
+  return `<div class="mealnut">${macroBar(t)}</div>`;
 }
 
 /* ---------- breakdown sheet ---------- */
@@ -184,7 +223,12 @@ function nutDayHtml() {
   const day = getDay(S.date, false);
   let h = sheetHead(tr('פירוט תזונתי', 'Nutrition breakdown') + ` · ${shortDate(S.date)}`) + `<div class="body">
     <p class="small muted" style="margin:0">${tr('הערכה לפי ערכים ממוצעים של מאכלים נפוצים. מאכל בלי כמות נספר כאחד (פרוסת לחם, משולש פיצה), ובלשון רבים ("שקדים") כמנה רגילה. לחיצה על מאכל מאפשרת לתקן את הערכים שלו, והתיקון חל על כל הימים.', 'Estimates from average values of common foods. A food without an amount counts as one (a slice of bread, a slice of pizza), and a plural ("almonds") as a usual portion. Tap a food to correct its values; the change applies to every day.')}</p>`;
-  if (isMoh() && hasFood(day)) h += mohHtml(dayN(day));
+  if (isMoh() && hasFood(day)) {
+    const t0 = dayN(day);
+    const go = dayInProgress(S.date);
+    h += mohHtml(t0, false, go ? tr('עד עכשיו', 'So far') : S.date === todayISO() ? tr('היום', 'Today') : tr('ביום הזה', 'That day'));
+    if (go) h += dayBalance(t0, S.date).hint;
+  }
   for (const m of MEALS) {
     const items = day ? day.meals[m] : [];
     if (!items.length) continue;
@@ -284,14 +328,17 @@ function nutStatsHtml(dates) {
   const n = nutSet();
   const tot = NU.sumNut(fd.map(iso => dayN(db.days[iso])));
   const avg = { k: tot.k / fd.length, p: tot.p / fd.length, c: tot.c / fd.length, f: tot.f / fd.length };
-  let inGoal = 0, balanced = 0;
+  let inGoal = 0, balanced = 0, judged = 0;
   const byFood = {};
   for (const iso of fd) {
     const d = db.days[iso];
     const t = dayN(d);
     if (n.goal && t.k <= n.goal * 1.05) inGoal++;
-    const b = bal(NU.macroPct(t));
-    if (b && b.level === 'ok') balanced++;
+    if (!dayInProgress(iso)) {
+      judged++;
+      const b = bal(NU.macroPct(t));
+      if (b && b.level === 'ok') balanced++;
+    }
     for (const m of MEALS) for (const it of d.meals[m]) { const x = itemN(it); byFood[it.name] = (byFood[it.name] || 0) + x.k; }
   }
   const topF = Object.keys(byFood).filter(k => byFood[k] > 0).sort((a, b) => byFood[b] - byFood[a]).slice(0, 6);
@@ -301,7 +348,7 @@ function nutStatsHtml(dates) {
       <div class="tile"><div class="big">${kc(avg.k)}</div><div class="lbl">${tr('קק״ל ביום בממוצע', 'kcal a day (avg)')}</div></div>
       <div class="tile"><div class="big" style="color:${MACRO.p.color}">${gr(avg.p)}<span class="small muted"> ${tr('ג׳', 'g')}</span></div><div class="lbl">${tr('חלבון ביום בממוצע', 'protein a day (avg)')}</div></div>
       ${n.goal ? `<div class="tile"><div class="big">${inGoal}<span class="small muted"> / ${fd.length}</span></div><div class="lbl">${tr(`ימים ביעד (${kc(n.goal)})`, `days on goal (${kc(n.goal)})`)}</div></div>` : ''}
-      <div class="tile"><div class="big" style="color:#2F8F5A">${balanced}<span class="small muted"> / ${fd.length}</span></div><div class="lbl">${tr('ימים מאוזנים', 'balanced days')}</div></div>
+      <div class="tile"><div class="big" style="color:#2F8F5A">${judged ? balanced : '–'}<span class="small muted"> / ${judged}</span></div><div class="lbl">${tr('ימים מאוזנים', 'balanced days')}</div></div>
     </div>
     <div class="section-t" style="margin:4px 0 6px">${n.mode === 'moh' ? tr('החלוקה הממוצעת מול המלצת משרד הבריאות', 'Average split vs the Ministry of Health ranges') : tr('החלוקה הממוצעת מול היעד', 'Average split vs target')}</div>
     ${macroBar(avg, { big: true, ticks: true })}
