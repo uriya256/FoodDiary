@@ -122,7 +122,7 @@ function lineChartSvg(pts, opts) {
   }
   if (opts.hline) {
     const y = Y(opts.hline.v);
-    s += `<line x1="${L}" x2="${W - Rm}" y1="${y}" y2="${y}" stroke="#2F8F5A" stroke-width="1.5" stroke-dasharray="2 4"/><text x="${W - Rm}" y="${y - 4}" text-anchor="end" class="ct" style="fill:#2F8F5A">${esc(opts.hline.label || '')}</text>`;
+    s += `<line x1="${L}" x2="${W - Rm}" y1="${y}" y2="${y}" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="2 4"/><text x="${W - Rm}" y="${y - 4}" text-anchor="end" class="ct" style="fill:var(--ok-text)">${esc(opts.hline.label || '')}</text>`;
   }
   (opts.extra || []).forEach(x => { s += `<path d="${path(x.pts)}" fill="none" stroke="${x.color || 'var(--muted)'}" stroke-width="1.6" ${x.dash ? 'stroke-dasharray="5 4"' : ''}/>`; });
   if (pts.length > 1) s += `<path d="${path(pts)} L${X(pts[pts.length - 1].d).toFixed(1)} ${H - B} L${X(pts[0].d).toFixed(1)} ${H - B} Z" fill="url(#${gid})"/>`;
@@ -140,9 +140,9 @@ function weightCardHtml() {
   const w = wtSet();
   let h = `<section class="card wt-card" aria-label="${tr('משקל', 'Weight')}">
     <div class="meal-head">
-      <span class="meal-icon" style="background:${WT_GRAD};--glow:#6D4FD8">${icon('scale', 24)}</span>
+      <span class="meal-icon tone-weight">${icon('scale', 22)}</span>
       <div class="meal-title"><h2>${tr('משקל', 'Weight')}</h2><div class="sub">${last ? `${fmtKg(last.kg)} ${tr('ק״ג', 'kg')} · ${agoText(last.date)}` : tr('שקילה פעם בשבוע מספיקה', 'Once a week is enough')}</div></div>
-      <button class="iconbtn primary" data-act="openWeight" aria-label="${tr('עדכון משקל', 'Update weight')}">${icon('plus')}</button>
+      <button class="iconbtn tonal" data-act="openWeight" aria-label="${tr('עדכון משקל', 'Update weight')}">${icon('plus')}</button>
     </div>`;
   if (!last) return h + `<div class="chips"><button class="chip ghost" data-act="openWeight">${icon('plus', 16)}${tr('הוספת משקל התחלתי', 'Add your starting weight')}</button></div></section>`;
   const first = L[0];
@@ -176,9 +176,9 @@ function weightSummaryHtml(withChart) {
     if (w.goalRate) {
       const first = L[0];
       const end = last.date;
-      extra.push({ pts: [{ d: first.date, v: first.kg }, { d: end, v: first.kg - w.goalRate * monthsBetween(first.date, end) }], color: '#9AA39E', dash: true });
+      extra.push({ pts: [{ d: first.date, v: first.kg }, { d: end, v: first.kg - w.goalRate * monthsBetween(first.date, end) }], color: 'var(--muted)', dash: true });
     }
-    h += lineChartSvg(L.map(x => ({ d: x.date, v: x.kg })), { color: '#6D4FD8', extra, hline: w.goalKg ? { v: w.goalKg, label: tr(`יעד ${fmtKg(w.goalKg)}`, `goal ${fmtKg(w.goalKg)}`) } : null, fmt: v => fmtKg(v), label: tr('גרף משקל', 'Weight chart') });
+    h += lineChartSvg(L.map(x => ({ d: x.date, v: x.kg })), { color: 'var(--weight)', extra, hline: w.goalKg ? { v: w.goalKg, label: tr(`יעד ${fmtKg(w.goalKg)}`, `goal ${fmtKg(w.goalKg)}`) } : null, fmt: v => fmtKg(v), label: tr('גרף משקל', 'Weight chart') });
     if (w.goalRate) h += `<div class="small muted chart-leg"><i class="dash"></i>${tr(`הקו המקווקו: ירידה של ${fmtKg(w.goalRate)} ק״ג בחודש מהשקילה הראשונה`, `Dashed line: losing ${fmtKg(w.goalRate)} kg a month from your first weigh-in`)}</div>`;
   }
   const rows = lossRows();
@@ -193,7 +193,7 @@ function weightSummaryHtml(withChart) {
         const months = (last.kg - w.goalKg) / ref.rate;
         h += `<p class="small" style="margin:8px 0 0">${tr(`בקצב של ${periodLabel(ref).replace(/ \(.*\)$/, '')} (${fmtKg(ref.rate)} ק״ג לחודש) תגיע ל-${fmtKg(w.goalKg)} ק״ג בערך ב-${monthYear(addMonthsISO(last.date, Math.round(months)))}.`, `At your ${periodLabel(ref).toLowerCase().replace(/ \(.*\)$/, '')} pace (${fmtKg(ref.rate)} kg a month) you would reach ${fmtKg(w.goalKg)} kg around ${monthYear(addMonthsISO(last.date, Math.round(months)))}.`)}</p>`;
       } else h += `<p class="small muted" style="margin:8px 0 0">${tr('כרגע אין ירידה, אז אי אפשר להעריך מתי תגיע ליעד.', 'No loss right now, so there is no estimate for reaching your goal.')}</p>`;
-    } else if (w.goalKg && last.kg <= w.goalKg) h += `<p class="small" style="margin:8px 0 0;color:#2F8F5A">${tr(`הגעת ליעד של ${fmtKg(w.goalKg)} ק״ג 🎉`, `You reached your ${fmtKg(w.goalKg)} kg goal 🎉`)}</p>`;
+    } else if (w.goalKg && last.kg <= w.goalKg) h += `<p class="small" style="margin:8px 0 0;color:var(--ok-text)">${tr(`הגעת ליעד של ${fmtKg(w.goalKg)} ק״ג 🎉`, `You reached your ${fmtKg(w.goalKg)} kg goal 🎉`)}</p>`;
   } else if (L.length === 1) h += `<p class="small muted" style="margin:0">${tr('אחרי השקילה הבאה יופיעו כאן הגרף והממוצעים.', 'After your next weigh-in the chart and averages show here.')}</p>`;
   return h;
 }

@@ -4,9 +4,10 @@
 
 const NU = window.Nutri;
 const MACRO = {
-  c: { he: 'פחמימות', en: 'Carbs', color: '#EFA43A' },
-  p: { he: 'חלבון', en: 'Protein', color: '#E0567A' },
-  f: { he: 'שומן', en: 'Fat', color: '#4C9BD8' },
+  // the colors are design tokens (style.css), so light and dark mode each get a readable shade
+  c: { he: 'פחמימות', en: 'Carbs', color: 'var(--carb)' },
+  p: { he: 'חלבון', en: 'Protein', color: 'var(--protein)' },
+  f: { he: 'שומן', en: 'Fat', color: 'var(--fat)' },
 };
 const MACRO_PRESETS = [[50, 25, 25], [55, 30, 15], [40, 30, 30], [30, 40, 30]];
 function mName(k) { return LANG === 'en' ? MACRO[k].en : MACRO[k].he; }
@@ -164,8 +165,8 @@ function dayBalance(t, iso) {
 function ringSvg(frac, size) {
   const r = 42, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, frac));
   const over = frac > 1.05;
-  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true"><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--line)" stroke-width="9"/>
-    <circle cx="50" cy="50" r="${r}" fill="none" stroke="${over ? '#E07A3A' : 'var(--accent)'}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 50 50)"/></svg>`;
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true"><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--track)" stroke-width="8"/>
+    <circle cx="50" cy="50" r="${r}" fill="none" stroke="${over ? 'var(--bad)' : 'var(--accent)'}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 50 50)"/></svg>`;
 }
 /** Monday-to-Sunday? Israel's week starts on Sunday, so the week is Sunday..Saturday. */
 function weekStart(iso) { const d = parseISO(iso); return addDays(iso, -d.getDay()); }
@@ -188,9 +189,9 @@ function nutDayCardHtml(iso) {
   const wk = wg ? weekKcal(iso) : 0;
   let h = `<section class="card nutcard" aria-label="${tr('קלוריות ואבות מזון', 'Calories and macros')}">
     <button class="nut-top" data-act="openNutDay">
-      <span class="ring">${goal ? ringSvg(t.k / goal, 92) : ringSvg(0, 92)}<span class="rc"><b>${kc(t.k)}</b><span>${goal ? tr(`מתוך ${kc(goal)}`, `of ${kc(goal)}`) : tr('קק״ל', 'kcal')}</span></span></span>
-      <span class="nut-macros">${['p', 'c', 'f'].map(k => `<span class="nm"><i style="background:${MACRO[k].color}"></i><span class="grow">${mName(k)}</span><b>${gr(t[k])}</b><span class="u">${tr('ג׳', 'g')}</span></span>`).join('')}
-        ${goal ? `<span class="small ${t.k > goal * 1.05 ? 'warn-t' : 'muted'}">${t.k <= goal ? tr(`נשארו ${kc(goal - t.k)} קק״ל`, `${kc(goal - t.k)} kcal left`) : tr(`${kc(t.k - goal)} קק״ל מעל היעד`, `${kc(t.k - goal)} kcal over goal`)}</span>` : `<span class="small muted">${tr('קק״ל משוער היום', 'estimated kcal today')}</span>`}
+      <span class="ring">${goal ? ringSvg(t.k / goal, 112) : ringSvg(0, 112)}<span class="rc"><b>${kc(t.k)}</b><span>${goal ? tr(`מתוך ${kc(goal)}`, `of ${kc(goal)}`) : tr('קק״ל', 'kcal')}</span></span></span>
+      <span class="nut-macros">${['p', 'c', 'f'].map(k => macroRowHtml(k, t[k], goal)).join('')}
+        ${goal ? `<span class="kleft ${t.k > goal * 1.05 ? 'warn-t' : 'muted'}">${t.k <= goal ? tr(`נשארו ${kc(goal - t.k)} קק״ל`, `${kc(goal - t.k)} kcal left`) : tr(`${kc(t.k - goal)} קק״ל מעל היעד`, `${kc(t.k - goal)} kcal over goal`)}</span>` : `<span class="kleft muted">${tr('קק״ל משוער היום', 'estimated kcal today')}</span>`}
       </span>
     </button>`;
   if (pct) {
@@ -207,6 +208,31 @@ function nutDayCardHtml(iso) {
   return h + `</section>`;
 }
 /**
+ * Display only: the grams of each macro that fit the daily goal. With the Ministry of Health ranges it is a range
+ * (e.g. 50–175 g protein for 2,000 kcal); with a fixed split it is one number. Same math as the breakdown sheet.
+ */
+function macroTargets(goal) {
+  if (!goal) return null;
+  if (isMoh()) return NU.gramRange(goal, NU.MOH);
+  const tg = nutSet().target, per = { c: 4, p: 4, f: 9 }, o = {};
+  for (const k of ['c', 'p', 'f']) { const v = goal * tg[k] / 100 / per[k]; o[k] = [v, v]; }
+  return o;
+}
+/** One macro in the day card: name, grams eaten / target, and a bar (fill = eaten, band = recommended range). */
+function macroRowHtml(k, g, goal) {
+  const rg = (macroTargets(goal) || {})[k];
+  const unit = tr('ג׳', 'g');
+  let target = unit, track = '';
+  if (rg) {
+    const lo = Math.round(rg[0]), hi = Math.round(rg[1]);
+    target = `/ ${lo === hi ? lo : `${lo}–${hi}`} ${unit}`;
+    const max = Math.max(hi * 1.25, g, 1);
+    const pos = (v) => Math.min(100, v / max * 100);
+    track = `<span class="mtrack" aria-hidden="true"><span class="band${lo === hi ? ' tick' : ''}" style="inset-inline-start:${pos(lo).toFixed(1)}%;width:${Math.max(0, pos(hi) - pos(lo)).toFixed(1)}%"></span><span class="fill" style="width:${pos(g).toFixed(1)}%"></span></span>`;
+  }
+  return `<span class="nm" style="--mc:${MACRO[k].color}"><span class="nm-h"><i></i><span class="grow">${mName(k)}</span><b>${gr(g)}</b><span class="u">${target}</span></span>${track}</span>`;
+}
+/**
  * The line under a meal's chips: how its calories split. No verdict: the recommended split is for the whole day,
  * and a good meal (eggs and a slice of bread for breakfast) can be far from it on its own.
  */
@@ -214,7 +240,10 @@ function mealNutHtml(items) {
   if (!nutOn() || !items || !items.length) return '';
   const t = mealN(items);
   if (t.k < 1) return '';
-  return `<div class="mealnut">${macroBar(t)}</div>`;
+  const pct = NU.macroPct(t);
+  // three compact tags in the macro colors (the day card's legend names them)
+  const tags = pct ? `<span class="mtags" title="${esc(macroText(pct))}">${['c', 'p', 'f'].map(k => `<span style="--mc:${MACRO[k].color}"><i></i><b>${pct[k]}%</b></span>`).join('')}</span>` : '';
+  return `<div class="mealnut">${macroBar(t)}${tags}</div>`;
 }
 
 /* ---------- breakdown sheet ---------- */
@@ -348,7 +377,7 @@ function nutStatsHtml(dates) {
       <div class="tile"><div class="big">${kc(avg.k)}</div><div class="lbl">${tr('קק״ל ביום בממוצע', 'kcal a day (avg)')}</div></div>
       <div class="tile"><div class="big" style="color:${MACRO.p.color}">${gr(avg.p)}<span class="small muted"> ${tr('ג׳', 'g')}</span></div><div class="lbl">${tr('חלבון ביום בממוצע', 'protein a day (avg)')}</div></div>
       ${n.goal ? `<div class="tile"><div class="big">${inGoal}<span class="small muted"> / ${fd.length}</span></div><div class="lbl">${tr(`ימים ביעד (${kc(n.goal)})`, `days on goal (${kc(n.goal)})`)}</div></div>` : ''}
-      <div class="tile"><div class="big" style="color:#2F8F5A">${judged ? balanced : '–'}<span class="small muted"> / ${judged}</span></div><div class="lbl">${tr('ימים מאוזנים', 'balanced days')}</div></div>
+      <div class="tile"><div class="big" style="color:var(--ok-text)">${judged ? balanced : '–'}<span class="small muted"> / ${judged}</span></div><div class="lbl">${tr('ימים מאוזנים', 'balanced days')}</div></div>
     </div>
     <div class="section-t" style="margin:4px 0 6px">${n.mode === 'moh' ? tr('החלוקה הממוצעת מול המלצת משרד הבריאות', 'Average split vs the Ministry of Health ranges') : tr('החלוקה הממוצעת מול היעד', 'Average split vs target')}</div>
     ${macroBar(avg, { big: true, ticks: true })}
@@ -362,10 +391,10 @@ function nutStatsHtml(dates) {
     const maxW = Math.max(wg, ...weeks.map(weekKcal));
     h += `<div class="section-t" style="margin:14px 0 8px">${tr('קלוריות בשבוע מול היעד', 'Weekly calories vs goal')}</div><div class="stack">${weeks.map(w => {
       const k = weekKcal(w);
-      return `<div class="barrow"><div class="row between"><span dir="ltr">${P.displayDate(w).slice(0, 5)}–${P.displayDate(addDays(w, 6)).slice(0, 5)}</span><span class="small ${k > wg * 1.05 ? 'warn-t' : 'muted'}">${tr(`${kc(k)} מתוך ${kc(wg)}`, `${kc(k)} of ${kc(wg)}`)}</span></div><div class="bar wk"><i style="width:${Math.round(k / maxW * 100)}%;background:${k > wg * 1.05 ? '#E07A3A' : 'var(--accent)'}"></i><s style="inset-inline-start:${Math.round(wg / maxW * 100)}%"></s></div></div>`;
+      return `<div class="barrow"><div class="row between"><span dir="ltr">${P.displayDate(w).slice(0, 5)}–${P.displayDate(addDays(w, 6)).slice(0, 5)}</span><span class="small ${k > wg * 1.05 ? 'warn-t' : 'muted'}">${tr(`${kc(k)} מתוך ${kc(wg)}`, `${kc(k)} of ${kc(wg)}`)}</span></div><div class="bar wk"><i style="width:${Math.round(k / maxW * 100)}%;background:${k > wg * 1.05 ? 'var(--bad)' : 'var(--accent)'}"></i><s style="inset-inline-start:${Math.round(wg / maxW * 100)}%"></s></div></div>`;
     }).join('')}</div>`;
   }
-  if (topF.length) h += `<div class="section-t" style="margin:14px 0 8px">${tr('מה הביא הכי הרבה קלוריות', 'Where most calories came from')}</div><div class="stack">${topF.map(f => `<div class="barrow"><div class="row between"><span>${esc(f)}</span><span class="muted small">${kc(byFood[f])} ${tr('קק״ל', 'kcal')}</span></div><div class="bar"><i style="width:${Math.round(byFood[f] / maxF * 100)}%;background:#EFA43A"></i></div></div>`).join('')}</div>`;
+  if (topF.length) h += `<div class="section-t" style="margin:14px 0 8px">${tr('מה הביא הכי הרבה קלוריות', 'Where most calories came from')}</div><div class="stack">${topF.map(f => `<div class="barrow"><div class="row between"><span>${esc(f)}</span><span class="muted small">${kc(byFood[f])} ${tr('קק״ל', 'kcal')}</span></div><div class="bar"><i style="width:${Math.round(byFood[f] / maxF * 100)}%"></i></div></div>`).join('')}</div>`;
   return h + `<p class="small muted" style="margin:10px 0 0">${tr('הערכה לפי ערכים ממוצעים.', 'Estimates from average values.')}</p></section>`;
 }
 /** The macro target in words, for the AI. */

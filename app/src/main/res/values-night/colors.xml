@@ -1,0 +1,4 @@
+<resources>
+    <!-- the page color of the dark theme (style.css), shown for a moment before the page loads -->
+    <color name="app_bg">#0F172A</color>
+</resources>

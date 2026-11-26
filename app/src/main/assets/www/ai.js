@@ -386,7 +386,7 @@ function viewChat() {
     const sug = LANG === 'en'
       ? ['What did I eat this week?', 'How am I doing with water today?', 'Suggest a dinner based on what I ate today', 'How am I progressing at the gym?', 'Remember that I don’t eat cilantro', 'I just had a toast with cheese']
       : ['מה אכלתי השבוע?', 'איך אני עם המים היום?', 'תציע ארוחת ערב לפי מה שאכלתי היום', 'איך אני מתקדם באימונים?', 'תזכור שאני לא אוהב כוסברה', 'אכלתי עכשיו טוסט עם גבינה'];
-    h += `<div class="card chat-hello"><div class="row" style="gap:10px"><span class="qi" style="--q1:#A78BFA;--q2:#6D5BD0">${icon('sparkle', 20)}</span><b>${tr('היי! אני מכיר את כל היומן שלך', 'Hi! I know your whole diary')}</b></div>
+    h += `<div class="card chat-hello"><div class="row" style="gap:10px"><span class="qi">${icon('sparkle', 20)}</span><b>${tr('היי! אני מכיר את כל היומן שלך', 'Hi! I know your whole diary')}</b></div>
       <p class="small muted" style="margin:8px 0 0">${tr('אפשר לשאול אותי על מה שאכלת, לבקש רעיונות, או פשוט לספר לי מה אכלת ואני ארשום. מה שתספר לי על עצמך אזכור גם בפעם הבאה.', 'Ask about what you ate, get ideas, or just tell me what you ate and I’ll log it. What you tell me about yourself I’ll remember next time too.')}</p>
       <div class="chips">${sug.map(t => `<button class="chip" data-act="aiSuggest" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>`;
   }
@@ -399,7 +399,7 @@ function viewChat() {
 }
 function aiSetupHtml() {
   return `<section class="card stack">
-    <div class="row" style="gap:10px"><span class="qi" style="--q1:#A78BFA;--q2:#6D5BD0">${icon('sparkle', 20)}</span><b class="grow">${tr('צ׳אט עם AI על מה שאכלת', 'Chat with AI about what you ate')}</b></div>
+    <div class="row" style="gap:10px"><span class="qi">${icon('sparkle', 20)}</span><b class="grow">${tr('צ׳אט עם AI על מה שאכלת', 'Chat with AI about what you ate')}</b></div>
     <p class="small muted" style="margin:0">${tr('הצ׳אט משתמש ב-Google Gemini בחינם. צריך פעם אחת מפתח אישי וחינמי:', 'The chat uses Google Gemini for free. You need a personal free key once:')}</p>
     <ol class="steps">
       <li>${tr('פתח את', 'Open')} <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> ${tr('והתחבר עם חשבון Google', 'and sign in with Google')}</li>

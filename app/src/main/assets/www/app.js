@@ -32,7 +32,9 @@ function setLang(l) {
   $('#tabs').setAttribute('aria-label', tr('ניווט ראשי', 'Main navigation'));
   try { A && A.setLang && A.setLang(LANG); } catch (e) { }
 }
-const ACCENTS = ['#2F7D4F', '#2C7F9A', '#4F5FC0', '#8A4FB0', '#C2456E', '#C0581F', '#8A6A1F', '#3F4B45'];
+const ACCENTS = ['#059669', '#0E7490', '#4F46E5', '#7C3AED', '#DB2777', '#EA580C', '#A16207', '#475569'];
+// the colors before the 2026 redesign, in the same order (a saved old color becomes its new version)
+const OLD_ACCENTS = ['#2F7D4F', '#2C7F9A', '#4F5FC0', '#8A4FB0', '#C2456E', '#C0581F', '#8A6A1F', '#3F4B45'];
 const STORE_KEY = 'fooddiary.v1';
 
 /* ---------------- icons ---------------- */
@@ -128,7 +130,7 @@ function freshDb() {
   return {
     v: 1, days: {}, foods: {}, aliases: {}, templates: [], routines: [], nut: {}, weights: [],
     settings: {
-      theme: 'auto', accent: '#2F7D4F', bg: 'sage', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false, motion: true,
+      theme: 'auto', accent: '#059669', bg: 'plain', dim: 0, blur: 0, cardAlpha: 0.88, rotateBg: false, motion: true, ui2: true,
       showWater: true, water: WATER_DEFAULTS(), reminder: { on: false, h: 21, m: 0 },
       showGym: true, gym: { rest: 90 },
       lang: window.__TAURI__ || /^(he|iw)/i.test(navigator.language || 'he') ? 'he' : 'en', // the Windows app starts in Hebrew
@@ -166,6 +168,14 @@ function hydrateDb(d) {
   out.settings.gym = Object.assign({ rest: 90 }, ds.gym || {});
   out.nut = out.nut && typeof out.nut === 'object' ? out.nut : {};
   out.weights = Array.isArray(out.weights) ? out.weights.filter(x => x && x.date && x.kg > 0) : [];
+  // the 2026 redesign: the old default look (sage background, forest green) becomes the new clean one.
+  // Only the look changes; a background or color picked on purpose stays (an old color becomes its new version).
+  if (!ds.ui2) {
+    if (!ds.bg || ds.bg === 'sage') out.settings.bg = 'plain';
+    const ai = OLD_ACCENTS.indexOf(String(ds.accent || '').toUpperCase());
+    if (ai >= 0) out.settings.accent = ACCENTS[ai];
+    out.settings.ui2 = true;
+  }
   // cottage cheese used to count as white cheese: entries written as "קוטג׳" are cottage again
   for (const iso in out.days) {
     const d = out.days[iso];
@@ -305,15 +315,15 @@ async function applyTheme() {
   const r = document.documentElement.style;
   r.setProperty('--accent', s.accent);
   {
-    const hex = (s.accent || '#2F7D4F').replace('#', '');
+    const hex = (s.accent || ACCENTS[0]).replace('#', '');
     const [R, G, B] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
     const mix = (t, k) => [R, G, B].map(c => Math.round(c + (t - c) * k));
     const rgb = (a) => `rgb(${a.join(',')})`;
     r.setProperty('--accent-light', rgb(mix(255, 0.3)));
+    r.setProperty('--accent-strong', rgb(mix(0, 0.12)));
     r.setProperty('--accent-text', rgb(dark ? mix(255, 0.45) : mix(0, 0.2)));
     for (const [name, a] of [['--accent-soft', .14], ['--a18', .18], ['--a38', .38], ['--a62', .62], ['--a22', .22], ['--a12', .12], ['--a08', .08]]) r.setProperty(name, `rgba(${R},${G},${B},${a})`);
   }
-  r.setProperty('--card-alpha', String(s.cardAlpha));
   r.setProperty('--blur', (s.blur || 0) + 'px');
   r.setProperty('--dim', String(s.dim || 0));
   const bgEl = $('#bg');
@@ -332,13 +342,16 @@ async function applyTheme() {
   }
   bgEl.style.background = css || 'var(--page)';
   if (!css) bgEl.style.backgroundColor = 'var(--page)';
+  // no background: solid cards on the page color. A photo or gradient: the "card opacity" setting applies.
+  document.documentElement.classList.toggle('has-bg', !!css);
+  r.setProperty('--card-alpha', css ? String(s.cardAlpha) : '1');
   const bdef = BUILTIN_BGS.find(x => x.id === id);
   const fx = (bdef && bdef.fx) || '';
   const fxEl = $('#bgFx');
   if (fxEl.dataset.fx !== fx) { fxEl.dataset.fx = fx; fxEl.innerHTML = fx ? window.Backgrounds.fxHtml(fx) : ''; }
   document.documentElement.classList.toggle('still', s.motion === false);
   document.documentElement.classList.toggle('has-fx', !!fx && s.motion !== false);
-  try { A && A.setBars && A.setBars(dark ? '#111613' : '#F3F4EF', darkTop); } catch (e) { }
+  try { A && A.setBars && A.setBars(dark ? '#0F172A' : '#F8FAFC', darkTop); } catch (e) { }
 }
 function rotatingBg() {
   const pool = customBgIds.length ? customBgIds.map(i => 'custom:' + i) : BUILTIN_BGS.filter(b => b.id !== 'plain').map(b => b.id);
@@ -444,6 +457,7 @@ function render(opts = {}) {
   const keepScroll = opts.keepScroll ? sc.scrollTop : 0;
   const html = { today: viewToday, history: viewHistory, chat: viewChat, stats: viewStats, settings: viewSettings }[S.tab]();
   sc.innerHTML = html;
+  sc.dataset.tab = S.tab;
   renderTabs();
   if (opts.anim) { sc.classList.remove('swap'); void sc.offsetWidth; sc.classList.add('swap'); }
   sc.scrollTop = keepScroll;
@@ -487,22 +501,27 @@ function viewToday() {
     </div>
   </section>
   <div class="quick">
-    <button class="btn" data-act="copyYesterday"><span class="qi" style="--q1:#7C9BFF;--q2:#5363D6">${icon('copy', 20)}</span>${tr('העתק מאתמול', 'Copy yesterday')}</button>
-    <button class="btn" data-act="openImport" data-mode="day"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span>${tr('פתק או טקסט', 'Note or text')}</button>
-    <button class="btn" data-act="shareDay"><span class="qi" style="--q1:#5EE0B2;--q2:#1E9C7A">${icon('share', 20)}</span>${tr('שתף את היום', 'Share day')}</button>
+    <button class="btn" data-act="copyYesterday"><span class="qi">${icon('copy', 20)}</span>${tr('העתק מאתמול', 'Copy yesterday')}</button>
+    <button class="btn" data-act="openImport" data-mode="day"><span class="qi">${icon('camera', 20)}</span>${tr('פתק או טקסט', 'Note or text')}</button>
+    <button class="btn" data-act="shareDay"><span class="qi">${icon('share', 20)}</span>${tr('שתף את היום', 'Share day')}</button>
   </div>`;
+  h += `<div class="daygrid">`;
+  if (!hasFood(day)) h += emptyDayHtml(iso, isToday);
   if (nutOn()) h += nutDayCardHtml(iso);
 
   for (const m of MEALS) {
     const items = day ? day.meals[m] : [];
     const note = day && day.mealNotes[m];
     const tpls = db.templates.filter(t => t.meal === m);
-    h += `<section class="card" aria-label="${MEAL[m].label}">
+    // the meal's calories stand out next to its name; the item count is the small line under it
+    const kcalHtml = items.length && nutOn() ? `<span class="meal-kcal" aria-label="${tr(`כ-${kc(mealN(items).k)} קק״ל`, `about ${kc(mealN(items).k)} kcal`)}"><b>${kc(mealN(items).k)}</b><span>${tr('קק״ל', 'kcal')}</span></span>` : '';
+    h += `<section class="card${items.length ? '' : ' meal-empty'}" aria-label="${MEAL[m].label}">
       <div class="meal-head">
-        <span class="meal-icon" style="background:${MEAL[m].grad};--glow:${MEAL[m].tint}">${icon(MEAL[m].icon, 24)}</span>
-        <div class="meal-title"><h2>${MEAL[m].label}</h2>${items.length ? `<div class="sub">${items.length} ${plural(items.length, 'פריט', 'פריטים', 'item', 'items')}${nutOn() ? ` · ≈ ${kc(mealN(items).k)} ${tr('קק״ל', 'kcal')}` : ''}</div>` : ''}</div>
+        <span class="meal-icon">${icon(MEAL[m].icon, 22)}</span>
+        <div class="meal-title"><h2>${MEAL[m].label}</h2>${items.length ? `<div class="sub">${items.length} ${plural(items.length, 'פריט', 'פריטים', 'item', 'items')}</div>` : ''}</div>
+        ${kcalHtml}
         <button class="iconbtn flat" data-act="mealMenu" data-meal="${m}" aria-label="${tr(`אפשרויות ל${MEAL[m].label}`, `${MEAL[m].label} options`)}">${icon('dots')}</button>
-        <button class="iconbtn primary" data-act="openAdd" data-meal="${m}" aria-label="${tr(`הוספה ל${MEAL[m].label}`, `Add to ${MEAL[m].label}`)}">${icon('plus')}</button>
+        <button class="iconbtn tonal" data-act="openAdd" data-meal="${m}" aria-label="${tr(`הוספה ל${MEAL[m].label}`, `Add to ${MEAL[m].label}`)}">${icon('plus', 20)}</button>
       </div>`;
     if (items.length) {
       h += `<div class="chips">${items.map((it, i) => itemChip(it, m, i)).join('')}</div>${mealNutHtml(items)}`;
@@ -518,7 +537,18 @@ function viewToday() {
   if (wtSet().show !== false) h += weightCardHtml();
   h += `<section class="card"><h3 class="row">${icon('note', 18)}${tr('הערות על היום', 'Notes for the day')}</h3>
     <textarea class="note" rows="2" data-on="dayNote" placeholder="${tr('איך הרגשת, אכלת בחוץ, משהו מיוחד…', 'How you felt, ate out, anything special…')}">${esc((day && day.note) || '')}</textarea></section>`;
-  return h;
+  return h + `</div>`;
+}
+/** A day with nothing eaten yet: one clear first step instead of four empty cards. */
+function emptyDayHtml(iso, isToday) {
+  const hr = new Date().getHours();
+  const meal = !isToday ? 'breakfast' : hr < 11 ? 'breakfast' : hr < 16 ? 'lunch' : hr < 21 ? 'dinner' : 'snack';
+  return `<section class="card empty-day">
+    <span class="ed-icon">${icon('note', 28)}</span>
+    <h2>${isToday ? tr('יום חדש, דף חדש', 'A fresh page') : tr('לא נרשם כלום ביום הזה', 'Nothing logged on this day')}</h2>
+    <p>${tr('כותבים מה אכלת כמו במחברת, והאפליקציה מחשבת קלוריות, חלבון, פחמימות ושומן.', 'Write what you ate like in a notebook, and the app works out calories, protein, carbs and fat.')}</p>
+    <div class="ed-actions"><button class="btn primary" data-act="openAdd" data-meal="${meal}">${icon('plus', 18)}${tr(`הוספה ל${MEAL[meal].label}`, `Add to ${MEAL[meal].label}`)}</button></div>
+  </section>`;
 }
 
 /* ---------------- view: history ---------------- */
@@ -625,15 +655,15 @@ function viewStats() {
   }
   h += `<div class="tiles">
     <div class="card tile"><div class="big">${logged.length}<span class="small muted"> / ${dates.length}</span></div><div class="lbl">${tr('ימים רשומים', 'days logged')}</div></div>
-    <div class="card tile"><div class="big" style="color:#B85C1E">${streak()}</div><div class="lbl">${tr('ימים ברצף', 'day streak')}</div></div>
+    <div class="card tile"><div class="big">${streak()}</div><div class="lbl">${tr('ימים ברצף', 'day streak')}</div></div>
     <div class="card tile"><div class="big">${(mealsTotal / logged.length).toFixed(1)}</div><div class="lbl">${tr('ארוחות ביום בממוצע', 'meals per day (avg)')}</div></div>
-    <div class="card tile"><div class="big" style="color:#2C8FB5">${waterDays ? fmtL(water / waterDays) : '–'}<span class="small muted"> ${tr('ל׳', 'L')}</span></div><div class="lbl">${tr(`מים ביום · ${waterHit} ימים ביעד`, `water a day · ${waterHit} ${waterHit === 1 ? 'day' : 'days'} on goal`)}</div></div>
+    <div class="card tile"><div class="big">${waterDays ? fmtL(water / waterDays) : '–'}<span class="small muted"> ${tr('ל׳', 'L')}</span></div><div class="lbl">${tr(`מים ביום · ${waterHit} ימים ביעד`, `water a day · ${waterHit} ${waterHit === 1 ? 'day' : 'days'} on goal`)}</div></div>
   </div>
   <section class="card"><h3>${tr('באילו ימים היה…', 'Days that included…')}</h3><div class="stack">`;
   const catOrder = Object.keys(FD.CATEGORIES).filter(c => catDays[c]).sort((a, b) => catDays[b] - catDays[a]);
   for (const c of catOrder) {
     const pct = Math.round(catDays[c] / logged.length * 100);
-    h += `<div class="barrow"><div class="row between"><span>${catLabel(c)}</span><span class="muted small">${tr(`${catDays[c]} מתוך ${logged.length} ימים`, `${catDays[c]} of ${logged.length} ${logged.length === 1 ? 'day' : 'days'}`)}</span></div><div class="bar"><i style="width:${pct}%;background:${FD.CATEGORIES[c].color}"></i></div></div>`;
+    h += `<div class="barrow"><div class="row between"><span>${catLabel(c)}</span><span class="muted small">${tr(`${catDays[c]} מתוך ${logged.length} ימים`, `${catDays[c]} of ${logged.length} ${logged.length === 1 ? 'day' : 'days'}`)}</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
   }
   h += `</div></section>
   <section class="card"><h3>${tr('מה אכלת הכי הרבה', 'What you ate most')}</h3><div class="seg" style="margin-bottom:12px">${mealSeg}</div><div class="stack">`;
@@ -729,7 +759,7 @@ function viewSettings() {
       <label class="li" role="button"><span class="grow"><span class="t">${tr('שחזור מגיבוי', 'Restore from backup')}</span><br><span class="s">${tr('טעינת קובץ גיבוי (מחליף את הנתונים)', 'Load a backup file (replaces your data)')}</span></span>${icon('undo', 18)}<input type="file" class="hidden" data-on="restore"></label>
       <button class="li" data-act="exportText"><span class="grow"><span class="t">${tr('ייצוא הכל כטקסט', 'Export all as text')}</span><br><span class="s">${tr('באותו פורמט שאתה כותב', 'In the same format you write')}</span></span>${icon('file', 18)}</button>
       <button class="li" data-act="exportCsv"><span class="grow"><span class="t">${tr('ייצוא CSV', 'Export CSV')}</span><br><span class="s">${tr('לאקסל או לדיאטנית', 'For Excel or your dietitian')}</span></span>${icon('download', 18)}</button>
-      <button class="li" data-act="wipe"><span class="grow"><span class="t" style="color:#B23A3A">${tr('מחיקת כל הנתונים', 'Delete all data')}</span></span>${icon('trash', 18)}</button>
+      <button class="li" data-act="wipe"><span class="grow"><span class="t" style="color:var(--bad-text)">${tr('מחיקת כל הנתונים', 'Delete all data')}</span></span>${icon('trash', 18)}</button>
     </div>
   </section>
   <section class="card">
@@ -897,7 +927,7 @@ function openMealMenu(meal) {
     <button class="li" data-act="copyMealPrev" data-meal="${meal}" ${prevHas ? '' : 'disabled'}>${icon('copy')}<span class="grow"><span class="t">${tr('העתק מאתמול', 'Copy from yesterday')}</span>${prevHas ? `<br><span class="s">${esc(prev.meals[meal].map(it => P.formatItem(it, { short: true })).join(', '))}</span>` : `<br><span class="s">${tr('אתמול לא נרשם', 'Nothing logged yesterday')}</span>`}</span></button>
     <button class="li" data-act="mealNote" data-meal="${meal}">${icon('note')}<span class="grow t">${day && day.mealNotes[meal] ? tr('עריכת הערה', 'Edit note') : tr('הוספת הערה (שעה, איפה, הרגשה)', 'Add a note (time, place, how you felt)')}</span></button>
     ${has ? `<button class="li" data-act="shareMeal" data-meal="${meal}">${icon('share')}<span class="grow t">${tr('שתף את הארוחה', 'Share meal')}</span></button>
-    <button class="li" data-act="clearMeal" data-meal="${meal}">${icon('trash')}<span class="grow t" style="color:#B23A3A">${tr('נקה את הארוחה', 'Clear meal')}</span></button>` : ''}
+    <button class="li" data-act="clearMeal" data-meal="${meal}">${icon('trash')}<span class="grow t" style="color:var(--bad-text)">${tr('נקה את הארוחה', 'Clear meal')}</span></button>` : ''}
   </div></div>`, { title: MEAL[meal].label });
 }
 function promptSheet(title, label, value, onOk, okLabel, multiline = false) {
@@ -995,7 +1025,7 @@ function scanBoxHtml() {
   const app = !!(A && A.ocrCamera);
   if (window.__IOS) return scanBoxIosHtml();
   return `<div class="scanbox">
-    <div class="row" style="gap:10px"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span><b class="grow">${tr('מפתק שכתבת ביד', 'From a handwritten note')}</b></div>
+    <div class="row" style="gap:10px"><span class="qi">${icon('camera', 20)}</span><b class="grow">${tr('מפתק שכתבת ביד', 'From a handwritten note')}</b></div>
     ${app ? `<div class="section-t" style="margin:0">${icon('sparkle', 16)} ${tr('Google Lens · הכי מדויק לכתב יד', 'Google Lens · best for handwriting')}</div>
     <div class="row" style="gap:8px">
       <button class="btn primary grow" data-act="lensCam">${icon('camera', 18)}${tr('צילום', 'Camera')}</button>
@@ -1016,7 +1046,7 @@ function scanBoxIosHtml() {
   let he = false;
   try { he = !!(A.ocrHebrew && A.ocrHebrew()); } catch (e) { }
   return `<div class="scanbox">
-    <div class="row" style="gap:10px"><span class="qi" style="--q1:#FFB36B;--q2:#F06A4A">${icon('camera', 20)}</span><b class="grow">${tr('מפתק שכתבת ביד', 'From a handwritten note')}</b></div>
+    <div class="row" style="gap:10px"><span class="qi">${icon('camera', 20)}</span><b class="grow">${tr('מפתק שכתבת ביד', 'From a handwritten note')}</b></div>
     <div class="section-t" style="margin:0">${icon('sparkle', 16)} ${tr('Google Lens · הכי מדויק לכתב יד', 'Google Lens · best for handwriting')}</div>
     <button class="btn primary block" data-act="lensCam">${icon('camera', 18)}${tr('פתח את Google Lens', 'Open Google Lens')}</button>
     <div class="small muted">${tr('נפתחת אפליקציית Google. לוחצים על סמל המצלמה בשורת החיפוש, מצלמים את הפתק, בוחרים "טקסט", "בחירת הכל" ו"העתקה", וחוזרים לכאן. הטקסט נכנס לבד; אם לא, לוחצים "הדבק מהלוח". צריך את אפליקציית Google מה-App Store.', 'The Google app opens. Tap the camera icon in the search bar, photograph the note, choose "Text", "Select all" and "Copy", then come back here. The text is pasted for you; if not, tap "Paste from clipboard". Needs the Google app from the App Store.')}</div>
@@ -1149,7 +1179,7 @@ function openPrivacy() {
 function openTemplates() { openSheet('tpls', tplsHtml(), { title: tr('ארוחות שמורות', 'Saved meals') }); }
 function tplsHtml() {
   return sheetHead(tr('ארוחות שמורות', 'Saved meals')) + `<div class="body">${db.templates.length ? `<div class="list">${db.templates.map(t => `<div class="li">
-    <span class="meal-icon" style="background:${MEAL[t.meal].grad};--glow:${MEAL[t.meal].tint}">${icon(MEAL[t.meal].icon, 20)}</span>
+    <span class="meal-icon">${icon(MEAL[t.meal].icon, 20)}</span>
     <span class="grow"><span class="t">${esc(t.name)}</span><br><span class="s">${esc(t.items.map(it => P.formatItem(it, { short: true })).join(', '))}</span></span>
     <button class="iconbtn plain" data-act="renameTpl" data-id="${t.id}" aria-label="${tr('שינוי שם', 'Rename')}">${icon('edit', 18)}</button>
     <button class="iconbtn plain" data-act="delTpl" data-id="${t.id}" aria-label="${tr('מחיקה', 'Delete')}">${icon('trash', 18)}</button></div>`).join('')}</div>`

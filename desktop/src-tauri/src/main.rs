@@ -30,7 +30,7 @@ window.__fdExtract = function () { return __EXPR__; };
     b.type = 'button';
     b.textContent = __LABEL__;
     b.style.cssText = 'position:fixed;left:16px;right:16px;bottom:16px;z-index:2147483647;height:52px;border:0;border-radius:14px;' +
-      'background:#2F7D4F;color:#fff;font:bold 17px "Segoe UI",system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer';
+      'background:#04845C;color:#fff;font:bold 17px "Segoe UI",system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer';
     b.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();

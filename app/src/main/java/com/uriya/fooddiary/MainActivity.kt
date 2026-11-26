@@ -240,7 +240,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         root = FrameLayout(this)
-        root.setBackgroundColor(Color.parseColor("#F5F6F2"))
+        root.setBackgroundColor(ContextCompat.getColor(this, R.color.app_bg)) // the page color, light or dark
         web = WebView(this)
         root.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         setContentView(root)
@@ -404,8 +404,8 @@ class MainActivity : ComponentActivity() {
             val he = lang != "en"
             val d = resources.displayMetrics.density
             fun dp(v: Int) = (v * d).toInt()
-            val bg = if (dark) Color.parseColor("#1B1D1A") else Color.WHITE
-            val fg = if (dark) Color.parseColor("#ECEDE8") else Color.parseColor("#1D2620")
+            val bg = if (dark) Color.parseColor("#1E293B") else Color.WHITE
+            val fg = if (dark) Color.parseColor("#F1F5F9") else Color.parseColor("#0F172A")
             val panel = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setBackgroundColor(bg)
@@ -443,7 +443,7 @@ class MainActivity : ComponentActivity() {
                 text = if (he) "קח את הערכים מהדף" else "Use the values on this page"
                 textSize = 16f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
-                background = GradientDrawable().apply { setColor(Color.parseColor("#2F7D4F")); cornerRadius = 14 * d }
+                background = GradientDrawable().apply { setColor(Color.parseColor("#04845C")); cornerRadius = 12 * d }
                 setOnClickListener {
                     wv.evaluateJavascript(extractJs) { r -> js("window.onWebValues && window.onWebValues(${r ?: "null"})") }
                 }

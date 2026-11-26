@@ -121,20 +121,20 @@ function bottleSvg(pct, fromPct) {
   return `<svg class="bottle" viewBox="0 0 90 170" aria-hidden="true">
     <defs>
       <clipPath id="bclip"><path d="M33 20h24v8c13 6 19 15 19 27v96c0 9-7 15-15 15H29c-8 0-15-6-15-15V55c0-12 6-21 19-27z"/></clipPath>
-      <linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7FD3F2"/><stop offset="1" stop-color="#2A86C9"/></linearGradient>
+      <linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7DD3FC"/><stop offset="1" stop-color="#0284C7"/></linearGradient>
       <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".35" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity=".25"/></linearGradient>
     </defs>
     <path d="M33 20h24v8c13 6 19 15 19 27v96c0 9-7 15-15 15H29c-8 0-15-6-15-15V55c0-12 6-21 19-27z" fill="rgba(140,200,230,.16)"/>
     <g clip-path="url(#bclip)">
       <g class="blevel" data-y="${y(pct)}" style="transform: translateY(${y(fromPct == null ? pct : fromPct)}px)">
-        <path class="bwave back" d="M-90 4 q11.25 -6 22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 V200 H-90z" fill="#7FD3F2" opacity=".55"/>
+        <path class="bwave back" d="M-90 4 q11.25 -6 22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 V200 H-90z" fill="#7DD3FC" opacity=".55"/>
         <path class="bwave" d="M-90 6 q11.25 -6 22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 t22.5 0 V200 H-90z" fill="url(#wgrad)"/>
       </g>
       <g class="bubbles2" fill="#fff" opacity=".7"><circle cx="34" cy="150" r="2"/><circle cx="52" cy="158" r="1.5"/><circle cx="60" cy="146" r="2.4"/></g>
     </g>
     ${[0.25, 0.5, 0.75].map(p => `<path d="M66 ${y(p)}h7" stroke="currentColor" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round"/>`).join('')}
     <path d="M33 20h24v8c13 6 19 15 19 27v96c0 9-7 15-15 15H29c-8 0-15-6-15-15V55c0-12 6-21 19-27z" fill="url(#glass)" stroke="currentColor" stroke-opacity=".45" stroke-width="2.2"/>
-    <rect x="30" y="6" width="30" height="15" rx="4" fill="#2C8FB5"/>
+    <rect x="30" y="6" width="30" height="15" rx="4" fill="#0284C7"/>
     <rect x="30" y="6" width="30" height="5" rx="2.5" fill="#fff" opacity=".25"/>
     <path d="M22 62v70" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>
     <text x="45" y="104" text-anchor="middle" direction="ltr" unicode-bidi="bidi-override" class="bpct">${Math.round(pct * 100)}%</text>
@@ -163,12 +163,13 @@ function waterCardHtml(iso) {
   const goalLine = Math.round(w.goalMl / maxDay * 100);
   const lastDrink = day && day.drinks && day.drinks.length ? day.drinks[day.drinks.length - 1] : null;
   return `<section class="card water-card">
-    <div class="row between"><h2 class="row">${icon('drop', 20, 'style="color:#2C8FB5"')}${tr('מים', 'Water')}</h2>
+    <div class="row between"><h2 class="row">${icon('drop', 20, 'style="color:var(--water)"')}${tr('מים', 'Water')}</h2>
       <button class="iconbtn flat" data-act="openDrinks" aria-label="${tr('עוד אפשרויות שתייה', 'More drink options')}">${icon('dots')}</button></div>
     <div class="water-main">
       <button class="bottle-btn" data-act="openDrinks" aria-label="${tr('הוספת שתייה', 'Add a drink')}">${bottleSvg(pct, from)}<span class="bcap">${tr('מהיעד היומי', 'of daily goal')}</span></button>
       <div class="water-info">
         <div class="wtotal"><b>${fmtL(total)}</b><span> ${tr('ליטר שתית היום', 'L drunk today')}</span></div>
+        <div class="wprog" role="img" aria-label="${tr(`${Math.round(pct * 100)}% מהיעד`, `${Math.round(pct * 100)}% of the goal`)}"><i style="width:${Math.min(100, Math.round(pct * 100))}%"></i></div>
         <button class="wgoal-btn" data-act="waterGoal">${tr(`היעד היומי: ${fmtL(w.goalMl)} ליטר`, `Daily goal: ${fmtL(w.goalMl)} L`)}${icon('edit', 13)}</button>
         <div class="wpace ${pace.kind}">${pace.text}</div>
         ${fromMeals ? `<div class="small muted">${tr(`כולל ${fmtAmount(fromMeals)} שנרשמו בארוחות`, `Includes ${fmtAmount(fromMeals)} logged in meals`)}</div>` : ''}

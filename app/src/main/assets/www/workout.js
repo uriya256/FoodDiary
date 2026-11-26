@@ -122,9 +122,9 @@ function workoutCardHtml(iso) {
   const routines = db.routines || [];
   let h = `<section class="card gym-card" aria-label="${tr('אימון', 'Workout')}">
     <div class="meal-head">
-      <span class="meal-icon" style="background:${GYM_GRAD};--glow:#D9467A">${icon('dumbbell', 24)}</span>
+      <span class="meal-icon tone-gym">${icon('dumbbell', 22)}</span>
       <div class="meal-title"><h2>${g && g.title ? esc(g.title) : tr('אימון', 'Workout')}</h2>${g ? `<div class="sub">${esc(gymSummary(g))}</div>` : ''}</div>
-      <button class="iconbtn primary" data-act="openGym" aria-label="${g ? tr('עריכת האימון', 'Edit workout') : tr('הוספת אימון', 'Add a workout')}">${icon(g ? 'edit' : 'plus')}</button>
+      <button class="iconbtn tonal" data-act="openGym" aria-label="${g ? tr('עריכת האימון', 'Edit workout') : tr('הוספת אימון', 'Add a workout')}">${icon(g ? 'edit' : 'plus')}</button>
     </div>`;
   if (g && g.ex.length) {
     const prs = prsOf(iso);
@@ -309,12 +309,12 @@ function exProgHtml(name) {
       const diff = Math.round((b.v - a.v) * 10) / 10;
       h += `<div class="prog-sum">
         ${tile(tr(`${fmtN1(a.v)} ← ${fmtN1(b.v)}`, `${fmtN1(a.v)} → ${fmtN1(b.v)}`), tr(`${unit}: מ-${P.displayDate(a.d)} עד היום`, `${unit}: ${P.displayDate(a.d)} to now`))}
-        ${tile(`${diff > 0 ? '+' : ''}${fmtN1(diff)}`, tr(`${unit} ב-${weeksText(span)}`, `${unit} in ${weeksText(span)}`), diff > 0 ? '#2F8F5A' : '')}
-        ${tile(fmtN1(best), tr(`הכי ${kind === 's' ? 'כבד' : 'הרבה'} (${unit})`, `best (${unit})`), '#D9467A')}
+        ${tile(`${diff > 0 ? '+' : ''}${fmtN1(diff)}`, tr(`${unit} ב-${weeksText(span)}`, `${unit} in ${weeksText(span)}`), diff > 0 ? 'var(--ok-text)' : '')}
+        ${tile(fmtN1(best), tr(`הכי ${kind === 's' ? 'כבד' : 'הרבה'} (${unit})`, `best (${unit})`))}
         ${tile(avgGap != null ? weeksText(Math.round(avgGap)) : '–', avgGap != null ? tr(`בממוצע בין העלאות (${ups.length} ${ups.length === 1 ? 'העלאה' : 'העלאות'})`, `on average between increases (${ups.length})`) : tr('עוד לא העלית', 'No increase yet'))}
       </div>`;
       if (span >= 14 && diff) h += `<p class="small" style="margin:0">${tr(`בממוצע ${diff > 0 ? '+' : ''}${fmtN1(diff / (span / 30.44))} ${unit} בחודש.`, `On average ${diff > 0 ? '+' : ''}${fmtN1(diff / (span / 30.44))} ${unit} a month.`)}${kind === 's' && epley(last.ex) ? ' ' + tr(`חזרה אחת מקסימלית משוערת: ${fmtN1(Math.round(epley(last.ex) * 2) / 2)} ק״ג.`, `Estimated one-rep max: ${fmtN1(Math.round(epley(last.ex) * 2) / 2)} kg.`) : ''}</p>`;
-      if (pts.length > 1) h += lineChartSvg(pts, { color: '#D9467A', fmt: v => fmtN1(Math.round(v * 2) / 2), label: tr(`גרף ${unit}`, `${unit} chart`) });
+      if (pts.length > 1) h += lineChartSvg(pts, { color: 'var(--gym)', fmt: v => fmtN1(Math.round(v * 2) / 2), label: tr(`גרף ${unit}`, `${unit} chart`) });
     }
   } else {
     const runs = H.filter(x => GY.paceOf(x.ex));
@@ -328,8 +328,8 @@ function exProgHtml(name) {
       h += `<div class="prog-sum">
         ${tile(`<span dir="ltr">${GY.clock(avg)}</span>`, tr(`קצב ממוצע לק״מ (${runs.length} פעמים)`, `average pace per km (${runs.length} times)`))}
         ${tile(`<span dir="ltr">${GY.clock(lp)}</span>`, tr('קצב בפעם האחרונה', 'pace last time'))}
-        ${tile(`<span dir="ltr">${GY.clock(best)}</span>`, tr('הקצב הכי מהיר', 'fastest pace'), '#D9467A')}
-        ${tile(runs.length > 1 ? `<span dir="ltr">${imp >= 0 ? '−' : '+'}${GY.clock(Math.abs(imp))}</span>` : '–', runs.length > 1 ? tr(imp >= 0 ? 'מהר יותר לק״מ מהפעם הראשונה' : 'איטי יותר לק״מ מהפעם הראשונה', imp >= 0 ? 'faster per km than the first time' : 'slower per km than the first time') : tr('אחרי עוד פעם נראה שיפור', 'Do it again to see a change'), runs.length > 1 && imp > 0 ? '#2F8F5A' : '')}
+        ${tile(`<span dir="ltr">${GY.clock(best)}</span>`, tr('הקצב הכי מהיר', 'fastest pace'))}
+        ${tile(runs.length > 1 ? `<span dir="ltr">${imp >= 0 ? '−' : '+'}${GY.clock(Math.abs(imp))}</span>` : '–', runs.length > 1 ? tr(imp >= 0 ? 'מהר יותר לק״מ מהפעם הראשונה' : 'איטי יותר לק״מ מהפעם הראשונה', imp >= 0 ? 'faster per km than the first time' : 'slower per km than the first time') : tr('אחרי עוד פעם נראה שיפור', 'Do it again to see a change'), runs.length > 1 && imp > 0 ? 'var(--ok-text)' : '')}
       </div>`;
       // the distance done most often (e.g. always 5 km): time for that distance
       const byKm = {};
@@ -344,19 +344,19 @@ function exProgHtml(name) {
         h += `<div class="section-t">${tr(`${fmtN1(+common)} ק״מ (${same.length} פעמים)`, `${fmtN1(+common)} km (${same.length} times)`)}</div>
           <div class="prog-sum">
             ${tile(`<span dir="ltr">${GY.clock(avgT)}</span>`, tr('זמן ממוצע', 'average time'))}
-            ${tile(`<span dir="ltr">${GY.clock(Math.min(...times))}</span>`, tr('הכי מהר', 'fastest'), '#D9467A')}
+            ${tile(`<span dir="ltr">${GY.clock(Math.min(...times))}</span>`, tr('הכי מהר', 'fastest'))}
             ${tile(`<span dir="ltr">${GY.clock(times[times.length - 1])}</span>`, tr('בפעם האחרונה', 'last time'))}
-            ${times.length >= 4 ? tile(`<span dir="ltr">${eAvg - rAvg >= 0 ? '−' : '+'}${GY.clock(Math.abs(eAvg - rAvg))}</span>`, tr('ממוצע 3 האחרונות מול הראשונות', 'last 3 average vs the first ones'), eAvg > rAvg ? '#2F8F5A' : '') : tile(`<span dir="ltr">${GY.clock(times[0])}</span>`, tr('בפעם הראשונה', 'first time'))}
+            ${times.length >= 4 ? tile(`<span dir="ltr">${eAvg - rAvg >= 0 ? '−' : '+'}${GY.clock(Math.abs(eAvg - rAvg))}</span>`, tr('ממוצע 3 האחרונות מול הראשונות', 'last 3 average vs the first ones'), eAvg > rAvg ? 'var(--ok-text)' : '') : tile(`<span dir="ltr">${GY.clock(times[0])}</span>`, tr('בפעם הראשונה', 'first time'))}
           </div>`;
       }
-      if (paces.length > 1) h += `<div class="section-t">${tr('קצב לק״מ (למעלה = מהר יותר)', 'Pace per km (higher = faster)')}</div>` + lineChartSvg(paces, { color: '#2C8FB5', invert: true, minPad: 0.1, fmt: v => GY.clock(v), label: tr('גרף קצב', 'Pace chart') });
+      if (paces.length > 1) h += `<div class="section-t">${tr('קצב לק״מ (למעלה = מהר יותר)', 'Pace per km (higher = faster)')}</div>` + lineChartSvg(paces, { color: 'var(--gym)', invert: true, minPad: 0.1, fmt: v => GY.clock(v), label: tr('גרף קצב', 'Pace chart') });
     } else {
       const pts = H.filter(x => x.ex.minutes).map(x => ({ d: x.date, v: x.ex.minutes }));
       if (pts.length) {
         const avg = pts.reduce((a, p) => a + p.v, 0) / pts.length;
-        h += `<div class="prog-sum">${tile(fmtN1(Math.round(avg)), tr('דקות בממוצע', 'minutes on average'))}${tile(fmtN1(Math.round(Math.max(...pts.map(p => p.v)))), tr('הכי ארוך (דקות)', 'longest (min)'), '#D9467A')}</div>
+        h += `<div class="prog-sum">${tile(fmtN1(Math.round(avg)), tr('דקות בממוצע', 'minutes on average'))}${tile(fmtN1(Math.round(Math.max(...pts.map(p => p.v)))), tr('הכי ארוך (דקות)', 'longest (min)'))}</div>
           <p class="small muted" style="margin:0">${tr('כדי לראות קצב, כתוב גם מרחק, למשל: ריצה 5 קמ 28:30', 'To see your pace, add the distance too, e.g. run 5 km 28:30')}</p>`;
-        if (pts.length > 1) h += lineChartSvg(pts, { color: '#2C8FB5', fmt: v => fmtN1(Math.round(v)), label: tr('גרף דקות', 'Minutes chart') });
+        if (pts.length > 1) h += lineChartSvg(pts, { color: 'var(--gym)', fmt: v => fmtN1(Math.round(v)), label: tr('גרף דקות', 'Minutes chart') });
       }
     }
   }
@@ -439,7 +439,7 @@ function gymStatsHtml(dates) {
   const prog = Object.keys(first).filter(n => count[n] >= 2).map(n => [n, first[n], lastV[n]]).sort((a, b) => (b[2] - b[1]) - (a[2] - a[1])).slice(0, 8);
   let h = `<section class="card"><h3 class="row">${icon('dumbbell', 18)}${tr('אימונים', 'Workouts')}</h3>
     <div class="tiles" style="margin-bottom:6px">
-      <div class="tile"><div class="big" style="color:#D9467A">${gd.length}</div><div class="lbl">${tr(`אימונים · ${(gd.length / weeks).toFixed(1)} בשבוע`, `workouts · ${(gd.length / weeks).toFixed(1)} a week`)}</div></div>
+      <div class="tile"><div class="big">${gd.length}</div><div class="lbl">${tr(`אימונים · ${(gd.length / weeks).toFixed(1)} בשבוע`, `workouts · ${(gd.length / weeks).toFixed(1)} a week`)}</div></div>
       <div class="tile"><div class="big">${minutes ? fmtNum(minutes) : '–'}</div><div class="lbl">${tr('דקות אימון', 'minutes trained')}</div></div>
       <div class="tile"><div class="big">${sets || '–'}</div><div class="lbl">${tr('סטים', 'sets')}</div></div>
       <div class="tile"><div class="big">${vol ? fmtNum(vol) : '–'}</div><div class="lbl">${tr('ק״ג נפח (חזרות × משקל)', 'kg volume (reps × weight)')}</div></div>
