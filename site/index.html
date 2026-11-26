@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>יומן אוכל · Food Diary</title>
+<meta name="description" content="יומן אוכל: רושמים ארוחות כמו במחברת, ורואים קלוריות, חלבון, פחמימות ושומן. Food Diary: log meals the way you write them.">
+<link rel="icon" href="icon.png">
+<style>
+  :root { color-scheme: light dark; --bg: #F5F6F2; --text: #1E2521; --muted: #5E6760; --card: #FFFFFF; --line: #E2E6DF; --accent: #2F7D4F; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #141816; --text: #E7ECE8; --muted: #9AA49D; --card: #1D2320; --line: #2C332F; --accent: #73C795; } }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
+  header { text-align: center; }
+  header img { width: 96px; height: 96px; border-radius: 22px; }
+  h1 { font-size: 1.7rem; margin: 10px 0 0; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px 22px 16px; margin-bottom: 18px; }
+  h2 { font-size: 1.08rem; margin: 16px 0 4px; }
+  ul { margin: 6px 0; padding-inline-start: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); }
+  .links { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon.png" alt="">
+    <h1>יומן אוכל · <span lang="en" dir="ltr">Food Diary</span></h1>
+    <p class="sub">רושמים ארוחות כמו במחברת, והאפליקציה מחשבת את השאר</p>
+  </header>
+
+  <section lang="he" dir="rtl">
+    <h2>מה יש באפליקציה</h2>
+    <ul>
+      <li>כותבים בחופשיות, למשל "בוקר: חביתה, 2 פרוסות לחם מלא", והיא מבינה מאכל, כמות וארוחה.</li>
+      <li>קלוריות, חלבון, פחמימות ושומן לכל ארוחה ולכל יום, מול ההמלצות של משרד הבריאות.</li>
+      <li>ערכים מדויקים של מוצרים מאתר היצרן או מצילום של התווית.</li>
+      <li>מעקב משקל, שתייה ואימונים בחדר הכושר.</li>
+      <li>עובדת בלי אינטרנט, והנתונים נשמרים רק אצלך.</li>
+    </ul>
+    <div class="links">
+      <a href="privacy.html">מדיניות פרטיות</a>
+      <a href="https://github.com/uriya256/FoodDiary/releases/latest">הורדה לאנדרואיד ול-Windows</a>
+    </div>
+  </section>
+
+  <section lang="en" dir="ltr">
+    <h2>What it does</h2>
+    <ul>
+      <li>Write freely, like "breakfast: omelette, 2 slices of whole wheat bread", and it understands the food, amount and meal.</li>
+      <li>Calories, protein, carbs and fat for every meal and day, against the Israeli Ministry of Health ranges.</li>
+      <li>Exact product values from the manufacturer's website or a photo of the label.</li>
+      <li>Weight, drinks and gym workout tracking.</li>
+      <li>Works offline, and your data stays with you.</li>
+    </ul>
+    <div class="links">
+      <a href="privacy.html">Privacy policy</a>
+      <a href="https://github.com/uriya256/FoodDiary/releases/latest">Download (Android and Windows)</a>
+    </div>
+  </section>
+</main>
+</body>
+</html>

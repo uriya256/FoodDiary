@@ -635,3 +635,13 @@ html.dark .mk.ok { color: #7DDBA6; } html.dark .mk.lo, html.dark .mk.hi { color:
 @keyframes spin { to { transform: rotate(360deg); } }
 .bal.soft { background: rgba(120, 120, 110, .13); color: var(--muted); }
 .nut-hint { margin: 2px 0 4px; color: var(--text, inherit); }
+
+/* privacy policy sheet (content comes from privacy.html) */
+.sheet .body.privacy { display: block; padding-bottom: calc(var(--sab) + 20px); }
+.privacy h2 { font-size: 16px; font-weight: 700; margin: 18px 0 2px; }
+.privacy p { margin: 6px 0; }
+.privacy p, .privacy li { line-height: 1.55; }
+.privacy ul { margin: 4px 0; padding-inline-start: 20px; }
+.privacy li { margin: 3px 0; }
+.privacy .date { color: var(--muted); font-size: 14px; margin: 0 0 4px; }
+.privacy a { color: var(--accent-text); }

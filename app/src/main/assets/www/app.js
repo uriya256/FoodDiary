@@ -72,6 +72,7 @@ const IC = {
   leaf: '<path d="M5 19c0-8 5-14 15-15-1 10-7 15-15 15z"/><path d="M5 19l8-8"/>',
   note: '<path class="d" d="M5 4h14v12l-4 4H5z"/><path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4M8 9h8M8 13h5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  shield: '<path d="M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6z"/><path d="M9 12l2 2 4-4"/>',
   merge: '<path d="M6 4v5a5 5 0 0 0 5 5h7"/><path d="M15 11l3 3-3 3"/><path d="M6 20v-3"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   sparkle: '<path class="d" d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15.5v4M17 17.5h4"/>',
@@ -731,6 +732,13 @@ function viewSettings() {
       <button class="li" data-act="wipe"><span class="grow"><span class="t" style="color:#B23A3A">${tr('מחיקת כל הנתונים', 'Delete all data')}</span></span>${icon('trash', 18)}</button>
     </div>
   </section>
+  <section class="card">
+    <h2 class="row" style="margin-bottom:4px">${icon('shield', 20)}${tr('פרטיות', 'Privacy')}</h2>
+    <div class="list">
+      <button class="li" data-act="openPrivacy"><span class="grow"><span class="t">${tr('מדיניות פרטיות', 'Privacy policy')}</span><br><span class="s">${tr('מה נשמר, ומתי מידע יוצא מהמכשיר', 'What is stored, and when information leaves your device')}</span></span>${icon(chevNext(), 18)}</button>
+    </div>
+    <div class="small muted" style="margin-top:6px">${tr('הקלוריות והערכים התזונתיים הם הערכה, ולא ייעוץ רפואי.', 'Calories and nutrition values are estimates, not medical advice.')}</div>
+  </section>
   <p class="center small muted">${tr('יומן אוכל', 'Food Diary')} ${A && A.appVersion ? esc(A.appVersion()) : ''} · ${tr('עובד בלי אינטרנט · הנתונים נשמרים רק בטלפון', 'Works offline · your data stays on your phone')}</p>`;
 }
 
@@ -1112,6 +1120,29 @@ function renameFood(from, to) {
   db.aliases[nk(from)] = to;
   for (const k in db.aliases) if (db.aliases[k] === from) db.aliases[k] = to;
   save();
+}
+
+/* ----- privacy policy (the same privacy.html the website shows) ----- */
+function openPrivacy() {
+  const title = tr('מדיניות פרטיות', 'Privacy policy');
+  openSheet('privacy', sheetHead(title) + `<div class="body privacy" id="privBody"><p class="muted">${tr('טוען…', 'Loading…')}</p></div>`, { full: true, title });
+  const lang = LANG === 'en' ? 'en' : 'he';
+  fetch('privacy.html').then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(html => {
+    const sec = new DOMParser().parseFromString(html, 'text/html').querySelector(`section.policy[lang="${lang}"]`);
+    const box = $('#privBody');
+    if (!sec || !box) return;
+    sec.querySelector('h1')?.remove();
+    box.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    box.innerHTML = sec.innerHTML;
+    // phone: the link opens in the browser. Computer app: plain text, so the window stays on the diary.
+    $$('a[href^="http"]', box).forEach(a => {
+      if (window.__TAURI__) { const t = document.createElement('span'); t.dir = 'ltr'; t.textContent = a.textContent; a.replaceWith(t); }
+      else { a.target = '_blank'; a.rel = 'noopener'; }
+    });
+  }).catch(() => {
+    const box = $('#privBody');
+    if (box) box.innerHTML = `<p>${tr('לא הצלחתי לפתוח את המדיניות.', "Couldn't open the policy.")}</p>`;
+  });
 }
 
 /* ----- templates ----- */
@@ -1552,6 +1583,7 @@ const ACT = {
     });
   },
   openTemplates() { openTemplates(); },
+  openPrivacy() { openPrivacy(); },
   renameTpl(el) {
     const t = db.templates.find(x => x.id === el.dataset.id);
     promptSheet(tr('שינוי שם', 'Rename'), tr('שם הארוחה', 'Meal name'), t.name, (v) => { if (v) t.name = v; save(); replaceSheetBody('tpls', tplsHtml()); });

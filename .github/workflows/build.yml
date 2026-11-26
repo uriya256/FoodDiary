@@ -44,19 +44,23 @@ jobs:
           fi
           keytool -list -keystore signing/fooddiary.keystore -storepass fooddiary | grep -i fingerprint || true
       - uses: gradle/actions/setup-gradle@v4
+      # APK: installs directly on the phone. AAB: the file Google Play asks for (same key = the Play upload key).
       - name: Build
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleRelease bundleRelease --stacktrace
           cp app/build/outputs/apk/release/app-release.apk FoodDiary.apk
+          cp app/build/outputs/bundle/release/app-release.aab FoodDiary.aab
       - uses: actions/upload-artifact@v4
         with:
           name: FoodDiary-APK
-          path: FoodDiary.apk
+          path: |
+            FoodDiary.apk
+            FoodDiary.aab
       # gh instead of a release action: uploads only the file, so a hiccup in other release calls can't fail the build
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view latest >/dev/null 2>&1 || gh release create latest --title "FoodDiary (latest build)" --notes "אנדרואיד: FoodDiary.apk. מחשב (Windows): FoodDiary.exe." --latest
-          for i in 1 2 3; do gh release upload latest FoodDiary.apk --clobber && exit 0; sleep 15; done; exit 1
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "FoodDiary (latest build)" --notes "אנדרואיד: FoodDiary.apk. גוגל פליי: FoodDiary.aab. מחשב (Windows): FoodDiary.exe." --latest
+          for i in 1 2 3; do gh release upload latest FoodDiary.apk FoodDiary.aab --clobber && exit 0; sleep 15; done; exit 1

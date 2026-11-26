@@ -1,0 +1,60 @@
+name: Publish website
+
+# The website (GitHub Pages): a short home page and the privacy policy that Google Play asks for.
+# The policy is the same privacy.html the app shows, so the two can't drift apart.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'app/src/main/assets/www/privacy.html'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      on: ${{ steps.pages.outputs.on }}
+    steps:
+      - id: pages
+        name: Is GitHub Pages on?
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          t=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null || true)
+          if [ "$t" = "workflow" ]; then echo "on=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "on=false" >> "$GITHUB_OUTPUT"
+          echo "::notice title=GitHub Pages is off::Settings > Pages > Build and deployment > Source: GitHub Actions. Then run this workflow again (Actions > Publish website > Run workflow)."
+
+  deploy:
+    needs: check
+    if: needs.check.outputs.on == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the site
+        run: |
+          mkdir -p _site
+          cp site/index.html _site/
+          cp app/src/main/assets/www/privacy.html _site/
+          cp desktop/src-tauri/icons/128x128@2x.png _site/icon.png
+          ls -la _site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

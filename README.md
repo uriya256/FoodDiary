@@ -30,9 +30,14 @@
 - **גיבוי ושחזור** (JSON), ייצוא כטקסט באותו פורמט שאתה כותב, וייצוא CSV. בנוסף נשמר גיבוי אוטומטי פנימי.
 
 ## פרטים טכניים
-מעטפת Kotlin עם WebView (minSdk 26, targetSdk 35). הממשק הוא HTML/JS מקומי ב-`app/src/main/assets/www`, נטען דרך WebViewAssetLoader.
+מעטפת Kotlin עם WebView (minSdk 26, targetSdk 36). הממשק הוא HTML/JS מקומי ב-`app/src/main/assets/www`, נטען דרך WebViewAssetLoader.
 הנתונים נשמרים ב-localStorage, ותמונות הרקע ב-IndexedDB. התזכורת משתמשת ב-AlarmManager.
 הגופן Rubik מצורף לאפליקציה (רישיון OFL).
+
+## גוגל פליי
+כל בנייה יוצרת גם `FoodDiary.aab`, הקובץ שגוגל פליי מבקש, באותו דף הורדות. הוא חתום באותו מפתח של ה-APK, שישמש כמפתח ההעלאה לחנות.
+מדיניות הפרטיות נמצאת ב-`app/src/main/assets/www/privacy.html`: האפליקציה מציגה אותה בהגדרות › פרטיות, והאתר מציג את אותו קובץ.
+**האתר (פעם אחת):** ב-GitHub נכנסים ל-Settings › Pages, ובשדה Source בוחרים GitHub Actions. מאז כל שינוי במדיניות או ב-`site/` מתפרסם לבד, בכתובת `https://uriya256.github.io/FoodDiary/privacy.html`. אפשר גם להפעיל ידנית: Actions › Publish website › Run workflow.
 
 ## מחשב (Windows)
 מורידים את `FoodDiary.exe` מדף ההורדות ופותחים, בלי התקנה. האפליקציה רצה על Edge WebView2, שמובנה ב-Windows 10 ו-11.
