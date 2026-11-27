@@ -2,7 +2,8 @@
  * Reads a product's nutrition values (per 100 g) from the web page that is open in the app's browser,
  * usually the manufacturer's product page. The app runs this inside that page when you tap
  * "use the values on this page"; it returns JSON text:
- * { ok, k, p, c, f, g, name, host, url }  (ok = all four values were found; g = serving size in grams, if written).
+ * { ok, k, p, c, f, g, per, name, host, url }  (ok = all four values were found; g = serving size in grams, if written;
+ * per = 'serving' when the page gave the values per serving only, like an American label, and they were turned into 100 g).
  * Loaded in the app itself (window.__FD_LABEL_API set first), it only adds window.FDLabel.fromText(text),
  * which reads the same values from the text of a photographed label.
  */
@@ -99,6 +100,52 @@
     return o.k != null && o.k > 0 && o.k < 950 && ['p', 'c', 'f'].every(function (k) { return o[k] != null && o[k] >= 0 && o[k] <= 100; });
   }
   function count(o) { return ['k', 'p', 'c', 'f'].filter(function (k) { return o[k] != null; }).length; }
+  // the serving size: "גודל מנה: 30 גרם", "מנה = 390 מ"ל", "Serving size 1 bar (60g)"
+  var SERVING = /(גודל\s*(?:ה)?מנה|מנה\s*(?:של|=)|serving\s*size)[\s\S]{0,30}?(\d+(?:[.,]\d+)?)\s*(גרם|ג['׳]|gr?\b|מ["״]?ל|ml)/i;
+  // the page names a "100 g" column / says "per 100 g"; or it gives values per serving (an American label)
+  var HAS100 = /((?:^|[^\d.,])100\s*(?:g\b|gr\b|ml\b|grams?|גרם|גר['׳]?|ג['׳]|מ["״]?ל|מיליליטר)|ל\s*-?\s*100|per\s*100)/i;
+  var PERSERV = /(amount\s*per\s*serving|%\s*daily\s*value|\bper\s*serving\b|\bper\s*portion\b)/i;
+  var COL100 = /((?:^|[^\d.,])100\s*(?:g\b|gr\b|ml\b|grams?|גרם|גר['׳]?|ג['׳]|מ["״]?ל|מיליליטר)|ל\s*-?\s*100|per\s*100|^\s*100\s*$)/i;
+  function cellText(c) { return String(c.textContent || '').replace(/\s+/g, ' ').trim(); }
+  function cellValue(key, name, m, text) {
+    if (key === 'k') return energy(name + ' ' + text, m.index + m[0].length);
+    var n = text.match(NUM);
+    return n ? num(n[1]) : null;
+  }
+  /** A real table whose header names a "100 g" column (ל-100 גרם, 100 מ"ל, Per 100 g, or just 100):
+   *  the values from that column, also when the serving column comes first. */
+  function fromTables() {
+    var best = {};
+    var tables = document.getElementsByTagName('table');
+    for (var t = 0; t < tables.length; t++) {
+      var rows = tables[t].rows;
+      if (!rows || rows.length < 3) continue;
+      var col = -1;
+      for (var r = 0; r < rows.length && r < 5 && col < 0; r++) {
+        var cs = rows[r].cells;
+        if (!cs.length || ROW.test(cellText(cs[0]))) continue; // a row of values, not the header
+        for (var c = 1; c < cs.length; c++) if (COL100.test(cellText(cs[c]))) { col = c; break; }
+      }
+      if (col < 1) continue;
+      var o = {};
+      for (var r2 = 0; r2 < rows.length; r2++) {
+        var cells = rows[r2].cells;
+        if (cells.length <= col) continue;
+        var name = cellText(cells[0]);
+        for (var q = 0; q < 4; q++) {
+          var key = 'kpcf'.charAt(q);
+          if (o[key] != null) continue;
+          var m = name.match(LABELS[key]);
+          if (!m || skip(key, name, m)) continue;
+          var v = cellValue(key, name, m, cellText(cells[col]));
+          if (v != null && isFinite(v)) o[key] = v;
+        }
+      }
+      if (good(o)) return o;
+      if (count(o) > count(best)) best = o;
+    }
+    return best;
+  }
 
   // names of every row a nutrition table may have, so a table read column by column can be matched up
   var ROW = /(אנרג|קלורי|חלבו|פחמי|סוכר|שומנ|שומן|רוו|טראנס|כולסטרול|נתרן|סיבים|סידן|מלח|ויטמין|ברזל|אשלגן|energy|calor|protein|carb|sugar|fat|satur|trans|cholest|sodium|fib(?:er|re)|salt|calcium)/i;
@@ -127,7 +174,7 @@
     if (count(b) >= count(a)) a = b;
     ['p', 'c', 'f'].forEach(function (k) { if (a[k] != null && (a[k] < 0 || a[k] > 100)) a[k] = null; });
     if (a.k != null && (a.k <= 0 || a.k >= 950)) a.k = null;
-    var sv = t.match(/(גודל\s*(?:ה)?מנה|מנה\s*(?:של|=)|serving\s*size)[^\d\n]{0,20}(\d+(?:[.,]\d+)?)\s*(גרם|ג['׳]|g\b|מ["״]?ל|ml)/i);
+    var sv = t.match(SERVING);
     a.g = sv ? num(sv[2]) : null;
     a.ok = good(a);
     return a;
@@ -135,21 +182,35 @@
   if (typeof window !== 'undefined' && window.__FD_LABEL_API) { window.FDLabel = { fromText: fromText }; return ''; }
 
   try {
-    var a = read(linesOf(document.body ? document.body.innerText : ''));
-    if (!good(a)) {
-      var b = read(leafLines());
-      if (good(b) || count(b) > count(a)) a = b;
+    var all = (document.body ? document.body.innerText : '');
+    var lines = linesOf(all);
+    var a = fromTables(); // a table with a "100 g" column: that column
+    var col100 = good(a);
+    if (!col100) {
+      var t1 = read(lines);
+      if (count(t1) >= count(a)) a = t1;
+      if (!good(a)) {
+        var b = read(leafLines());
+        if (good(b) || count(b) > count(a)) a = b;
+      }
+    }
+    var sv = all.match(SERVING);
+    var g = sv ? num(sv[2]) : null;
+    // values per serving only (an American label: "Amount per serving", "% Daily Value"): turned into 100 g
+    var per = '';
+    var sec = section(lines).join('\n');
+    if (!col100 && g > 0 && g < 1000 && PERSERV.test(sec) && !HAS100.test(sec)) {
+      ['k', 'p', 'c', 'f'].forEach(function (k) { if (a[k] != null) a[k] = Math.round(a[k] * 1000 / g) / 10; });
+      per = 'serving';
     }
     ['p', 'c', 'f'].forEach(function (k) { if (a[k] != null && (a[k] < 0 || a[k] > 100)) a[k] = null; });
     if (a.k != null && (a.k <= 0 || a.k >= 950)) a.k = null;
-    var all = (document.body ? document.body.innerText : '');
-    var sv = all.match(/(גודל\s*(?:ה)?מנה|מנה\s*(?:של|=)|serving\s*size)[^\d\n]{0,20}(\d+(?:[.,]\d+)?)\s*(גרם|ג['׳]|g\b|מ["״]?ל|ml)/i);
     var h1 = document.querySelector('h1');
     var og = document.querySelector('meta[property="og:title"]');
     var name = (h1 && h1.textContent.trim()) || (og && og.getAttribute('content')) || document.title || '';
     name = name.replace(/\s+/g, ' ').split(/\s[|–—-]\s/)[0].trim().slice(0, 80);
     return JSON.stringify({
-      ok: good(a), k: a.k, p: a.p, c: a.c, f: a.f, g: sv ? num(sv[2]) : null,
+      ok: good(a), k: a.k, p: a.p, c: a.c, f: a.f, g: g, per: per,
       name: name, host: location.hostname.replace(/^www\./, ''), url: location.href,
     });
   } catch (e) {

@@ -6,27 +6,159 @@
  * ========================================================================== */
 'use strict';
 
-/** Manufacturers whose sites we search (Google, limited to the site). */
-const MKT_SITES = [
-  { id: 'tnuva', he: 'תנובה', en: 'Tnuva', site: 'tnuva.co.il' },
-  { id: 'strauss', he: 'שטראוס / עלית', en: 'Strauss / Elite', site: 'strauss-group.co.il' },
-  { id: 'osem', he: 'אסם / נסטלה', en: 'Osem / Nestlé', site: 'osem-nestle.co.il' },
-  { id: 'tara', he: 'טרה', en: 'Tara', site: 'tara.co.il' },
-  { id: 'angel', he: 'אנג׳ל', en: 'Angel', site: 'angel.co.il' },
-];
-const MKT = { food: '', from: 'edit', q: '', site: '', other: '', step: 'search', vals: null, always: true, open: false };
+/** The companies whose sites we search (Google, limited to their sites): brands.js. */
+const MKT_BRANDS = BRANDS;
+/** Shown first, before anything is typed. */
+const MKT_SITES = MKT_BRANDS.filter(b => b.top);
+/** Every domain -> its company. Main sites first, so a site two companies search belongs to its own company. */
+const MKT_BY_SITE = {};
+MKT_BRANDS.forEach(b => { if (!MKT_BY_SITE[b.site]) MKT_BY_SITE[b.site] = b; });
+MKT_BRANDS.forEach(b => b.d.forEach(d => { if (!MKT_BY_SITE[d]) MKT_BY_SITE[d] = b; }));
 
-function mktSet() { const s = db.settings; if (!s.mkt) s.mkt = { site: 'tnuva.co.il', mine: [] }; if (!s.mkt.mine) s.mkt.mine = []; return s.mkt; }
+const MKT = {
+  food: '', from: 'edit', q: '', site: '', other: '', step: 'search', vals: null, always: true, open: false,
+  find: '', found: [], auto: false, picked: false, qEn: '', qEnEdited: false,
+};
+
+function mktSet() {
+  const s = db.settings;
+  if (!s.mkt) s.mkt = { site: 'tnuva.co.il', mine: [] };
+  if (!s.mkt.mine) s.mkt.mine = [];
+  if (!s.mkt.recent) s.mkt.recent = [];
+  return s.mkt;
+}
 /** "https://www.berman.co.il/products" -> "berman.co.il" */
 function mktDomain(s) {
   const m = String(s || '').trim().toLowerCase().match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})(?:[/:?#]|$)/);
   return m ? m[1] : '';
 }
-function mktSites() {
-  const mine = mktSet().mine.filter(d => !MKT_SITES.some(x => x.site === d)).map(d => ({ id: d, he: d, en: d, site: d, mine: true }));
-  return MKT_SITES.concat(mine);
+/** The company of a site (also of its sub-sites, like m.rami-levy.co.il), or a site the user added himself. */
+function mktBrand(site) {
+  const s = mktDomain(site);
+  if (!s) return null;
+  let b = MKT_BY_SITE[s];
+  const p = s.split('.');
+  for (let i = 1; !b && i < p.length - 1; i++) b = MKT_BY_SITE[p.slice(i).join('.')];
+  if (b) return b;
+  return mktSet().mine.includes(s) ? { site: s, he: s, en: s, d: [s], al: [], g: '', e: false, x: true, mine: true } : null;
 }
-function mktSiteName(site) { const x = mktSites().find(s => s.site === site); return x ? tr(x.he, x.en) : site; }
+/** Sites the user added that aren't in the list. */
+function mktMine() { return mktSet().mine.map(mktBrand).filter(b => b && b.mine); }
+/** How a company is called on the screen: international ones by their own (English) name. */
+function mktLabel(b) { return LANG === 'en' || b.e ? b.en : b.he; }
+function mktSiteName(site) { const b = mktBrand(site); return b ? mktLabel(b) : String(site || ''); }
+
+/* ---------- finding the company in what was written ---------- */
+/** Folded so "קלוג׳ס", "קלוגס" and "Kellogg's" are the same, and "Coca-Cola" is "coca cola". */
+function mktFold(s) {
+  return String(s || '').toLowerCase().replace(/[֑-ׇ]/g, '').replace(/[׳'’`"״]/g, '')
+    .replace(/[-_/.,:;!?()[\]{}+|]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function mktEsc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+let MKT_NAMES = null;
+/** Every name that finds a company, the longest first. A Hebrew name of 4 letters or more is also found
+ *  with ו/ה/ב/ל/מ/ש/כ before it ("ובמבה"); shorter ones only alone ("טרה", not "מטרה"). */
+function mktNames() {
+  if (MKT_NAMES) return MKT_NAMES;
+  MKT_NAMES = [];
+  MKT_BRANDS.forEach((b, i) => {
+    const own = new Set((b.x ? [] : [b.he, b.en, b.he.split('/')[0], b.en.split('/')[0]]).map(mktFold));
+    new Set([...own].concat(b.al.map(mktFold))).forEach(n => {
+      if (n.length < 2) return;
+      const pre = /^[א-ת]/.test(n) && n.length >= 4 ? '[והבלמשכ]{0,2}' : '';
+      const src = '(^| )' + pre + mktEsc(n) + '(?= |$)';
+      MKT_NAMES.push({ b, i, n, own: own.has(n), re: new RegExp(src), all: new RegExp(src, 'g') });
+    });
+  });
+  MKT_NAMES.sort((a, b) => b.n.length - a.n.length || a.i - b.i);
+  return MKT_NAMES;
+}
+/** The companies named in the text, the most specific first ("שוקולד פרה" before "עלית"). */
+function mktDetect(text) {
+  const t = mktFold(text);
+  const out = [];
+  if (t) for (const x of mktNames()) if (!out.includes(x.b) && x.re.test(t)) out.push(x.b);
+  return out;
+}
+/** The companies whose name, other name or site has what was typed in the company search. */
+function mktFindList(q) {
+  q = mktFold(q);
+  if (!q) return [];
+  const flat = q.replace(/ /g, '');
+  const hits = [];
+  MKT_BRANDS.concat(mktMine()).forEach((b, i) => {
+    const names = [b.he, b.en].map(mktFold), al = b.al.map(mktFold);
+    const starts = (n) => n.startsWith(q) || n.includes(' ' + q);
+    const s = names.some(starts) ? 3 : names.some(n => n.includes(q)) ? 2
+      : al.some(starts) || b.d.some(d => d.startsWith(flat)) ? 1 : 0;
+    if (s) hits.push([s, i, b]);
+  });
+  return hits.sort((a, b) => b[0] - a[0] || a[1] - b[1]).slice(0, 24).map(x => x[2]);
+}
+
+/* ---------- searching an English site ---------- */
+/** Words that are common in product names, for a search on an English site (with the food names of nutdata.js). */
+const MKT_EN_WORDS = {
+  'שוקולד': 'chocolate', 'שוקולד חלב': 'milk chocolate', 'שוקולד מריר': 'dark chocolate', 'מריר': 'dark', 'שוקולד לבן': 'white chocolate',
+  'אגוזי לוז': 'hazelnut', 'לוז': 'hazelnut', 'אגוזים': 'nuts', 'בוטנים': 'peanuts', 'שקדים': 'almonds', 'קשיו': 'cashew', 'פיסטוק': 'pistachio',
+  'חטיף': 'bar', 'חטיפים': 'bars', 'חטיף חלבון': 'protein bar', 'חטיפי חלבון': 'protein bars', 'בר': 'bar', 'ברים': 'bars',
+  'חלבון': 'protein', 'אבקת חלבון': 'protein powder', 'משקה חלבון': 'protein shake', 'שייק חלבון': 'protein shake', 'וויי': 'whey', 'איזולט': 'isolate',
+  'עוגיות': 'cookies', 'עוגייה': 'cookie', 'ביסקוויט': 'biscuits', 'ביסקוויטים': 'biscuits', 'וופל': 'wafer', 'ופל': 'wafer', 'וופלים': 'wafers', 'קרקרים': 'crackers', 'קרקר': 'crackers',
+  'דגני בוקר': 'cereal', 'קורנפלקס': 'corn flakes', 'גרנולה': 'granola', 'מוזלי': 'muesli', 'שיבולת שועל': 'oats', 'דייסה': 'porridge',
+  'ממרח': 'spread', 'חמאת בוטנים': 'peanut butter', 'חמאת שקדים': 'almond butter', 'ריבה': 'jam', 'דבש': 'honey', 'סירופ מייפל': 'maple syrup',
+  'גלידה': 'ice cream', 'יוגורט': 'yogurt', 'יוגורט יווני': 'greek yogurt', 'גבינה': 'cheese', 'גבינת שמנת': 'cream cheese', 'חמאה': 'butter', 'חלב': 'milk', 'משקה שקדים': 'almond milk', 'חלב שקדים': 'almond milk', 'משקה שיבולת שועל': 'oat milk', 'משקה סויה': 'soy milk',
+  'משקה': 'drink', 'מיץ': 'juice', 'תפוזים': 'orange', 'תפוחים': 'apple', 'ענבים': 'grape', 'לימונדה': 'lemonade', 'משקה אנרגיה': 'energy drink', 'אנרגיה': 'energy', 'זירו': 'zero', 'דיאט': 'diet', 'ללא סוכר': 'sugar free', 'בלי סוכר': 'sugar free', 'מים': 'water', 'מוגז': 'sparkling', 'סודה': 'soda', 'בירה': 'beer', 'תה קר': 'iced tea',
+  'קפה': 'coffee', 'תה': 'tea', 'תה ירוק': 'green tea', 'קפסולות': 'capsules', 'קפסולה': 'capsule', 'לאטה': 'latte', 'קפוצ׳ינו': 'cappuccino', 'הפוך': 'latte', 'אספרסו': 'espresso', 'מוקה': 'mocha', 'שוקו': 'chocolate milk', 'קקאו': 'cocoa',
+  'פסטה': 'pasta', 'ספגטי': 'spaghetti', 'פנה': 'penne', 'רוטב': 'sauce', 'רוטב עגבניות': 'tomato sauce', 'עגבניות': 'tomatoes', 'קטשופ': 'ketchup', 'מיונז': 'mayonnaise', 'חרדל': 'mustard', 'רוטב סויה': 'soy sauce', 'סויה': 'soy', 'רוטב ברביקיו': 'bbq sauce', 'צ׳ילי': 'chili',
+  'אורז': 'rice', 'אטריות': 'noodles', 'נודלס': 'noodles', 'מרק': 'soup', 'טונה': 'tuna', 'סלמון': 'salmon', 'שעועית': 'beans', 'תירס': 'corn', 'אפונה': 'peas', 'אננס': 'pineapple', 'אפרסק': 'peach',
+  'צ׳יפס': 'chips', 'ציפס': 'chips', 'בייגלה': 'pretzels', 'פופקורן': 'popcorn', 'סוכריות': 'candy', 'סוכריה': 'candy', 'גומי': 'gummies', 'מסטיק': 'gum', 'מנטה': 'mint',
+  'קינמון': 'cinnamon', 'וניל': 'vanilla', 'תות': 'strawberry', 'תותים': 'strawberry', 'בננה': 'banana', 'קרמל': 'caramel', 'קרמל מלוח': 'salted caramel', 'מלוח': 'salted', 'קוקוס': 'coconut', 'פירות יער': 'berries', 'אוכמניות': 'blueberry', 'לימון': 'lemon', 'מנגו': 'mango',
+  'פיצה': 'pizza', 'המבורגר': 'burger', 'צ׳יזבורגר': 'cheeseburger', 'נאגטס': 'nuggets', 'עוף': 'chicken', 'סלט': 'salad', 'כריך': 'sandwich', 'סנדוויץ׳': 'sandwich', 'טורטייה': 'tortilla', 'טורטיות': 'tortillas', 'עטיפה': 'wrap', 'בוריטו': 'burrito', 'טאקו': 'taco',
+  'מאפין': 'muffin', 'סופגנייה': 'donut', 'דונאט': 'donut', 'עוגה': 'cake', 'בראוני': 'brownie', 'קרואסון': 'croissant', 'בייגל': 'bagel', 'פנקייק': 'pancake', 'לחם': 'bread', 'פיתה': 'pita',
+  'שייק': 'shake', 'מילקשייק': 'milkshake', 'סמוזי': 'smoothie', 'קטן': 'small', 'גדול': 'large', 'בינוני': 'medium', 'אורגני': 'organic', 'טבעוני': 'vegan', 'ללא גלוטן': 'gluten free', 'לייט': 'light', 'דל שומן': 'low fat', 'מלא': 'whole grain',
+};
+let MKT_HE_EN = null;
+function mktHeEn() {
+  if (MKT_HE_EN) return MKT_HE_EN;
+  const m = {};
+  const en = (NU && NU.NUT_EN) || {};
+  Object.keys(en).forEach(k => { const he = mktFold(en[k]); if (!m[he]) m[he] = k; });
+  Object.keys(MKT_EN_WORDS).forEach(he => { m[mktFold(he)] = MKT_EN_WORDS[he]; });
+  return (MKT_HE_EN = m);
+}
+/** What to search on an English site for a product written in Hebrew: the company by its English name,
+ *  another company written by its name too, the words we know in English, and numbers and English words
+ *  as they are. Other Hebrew words (and product names of other companies, "פפסי") are left out. */
+function mktEnQuery(q, b) {
+  let t = mktFold(q);
+  const words = [];
+  for (const x of mktNames()) {
+    if (!x.re.test(t)) continue;
+    t = t.replace(x.all, ' ').replace(/\s+/g, ' ').trim();
+    if (x.b !== b && x.b.g !== 't' && x.own) words.push(x.b.en);
+  }
+  const dict = mktHeEn();
+  const tok = t.split(' ').filter(Boolean);
+  for (let i = 0; i < tok.length;) {
+    let used = 0;
+    for (let n = Math.min(3, tok.length - i); n >= 1 && !used; n--) {
+      const ph = tok.slice(i, i + n).join(' ');
+      const bare = /^[והבלמשכ][א-ת]{2}/.test(ph) ? ph.slice(1) : '';
+      const w = dict[ph] || (bare && dict[bare]);
+      if (w) { words.push(w); used = n; }
+    }
+    if (!used) { if (!/[א-ת]/.test(tok[i])) words.push(tok[i]); used = 1; }
+    i += used;
+  }
+  if (b && !b.mine && b.g !== 't' && !words.some(w => mktFold(w) === mktFold(b.en))) words.unshift(b.en);
+  return [...new Set(words)].join(' ').trim();
+}
+/** The search on an English site is in English; the user may change it. */
+function mktQEn() {
+  if (!MKT.qEnEdited) MKT.qEn = mktEnQuery(MKT.q, mktBrand(MKT.site));
+  return MKT.qEn;
+}
+function mktNeedsEn(b) { return !!(b && b.e && LANG !== 'en' && /[א-ת]/.test(MKT.q || '')); }
 
 /** The product chosen for an item: for this item only, or always for this food. */
 function prodOf(it) {
@@ -43,7 +175,13 @@ function prodLabel(p) { return esc(p.n || '') + (p.b ? ` · ${esc(p.b)}` : ''); 
 function openMarket(food, from, said) {
   MKT.food = food; MKT.from = from; MKT.step = 'search'; MKT.vals = null; MKT.always = true; MKT.other = ''; MKT.reading = '';
   MKT.q = said || (LANG === 'en' && NU.NUT_EN[food]) || food;
-  MKT.site = mktSet().site || MKT_SITES[0].site;
+  MKT.find = ''; MKT.picked = false; MKT.qEn = ''; MKT.qEnEdited = false;
+  // the company named in what was written ("במבה" -> Osem), else the one of the product chosen before, else the last one used
+  MKT.found = mktDetect(`${said || ''} ${food || ''}`);
+  const before = from === 'edit' && EDIT.it ? prodOf(EDIT.it) : (db.nut && db.nut[food] && db.nut[food].prod);
+  const known = [before && before.site, mktSet().site].map(s => mktBrand(s)).find(Boolean);
+  MKT.auto = MKT.found.length > 0;
+  MKT.site = MKT.auto ? MKT.found[0].site : known ? known.site : MKT_SITES[0].site;
   openSheet('market', mktHtml(), { title: tr('ערכים של המוצר', 'Product values'), full: true, onClose: () => { if (MKT.open) mktCloseWeb(); } });
 }
 function mktHtml() {
@@ -51,21 +189,78 @@ function mktHtml() {
   return head + (MKT.step === 'confirm' ? mktConfirmHtml() : mktSearchHtml());
 }
 function mktSearchHtml() {
-  const sites = mktSites();
-  const other = MKT.site === '*';
   return `<div class="body">
     <div class="small muted">${tr(`בשביל: ${esc(MKT.food)}`, `For: ${esc(MKT.food)}`)}</div>
     <div class="section-t" style="margin:0">${icon('globe', 16)} ${tr('מאתר היצרן', "From the maker's site")}</div>
     <label class="field"><span>${tr('שם המוצר', 'Product name')}</span><input type="search" data-on="mktQ" value="${esc(MKT.q)}" placeholder="${tr('למשל: קוטג׳ 5%', 'e.g. cottage cheese 5%')}" autocomplete="off" enterkeyhint="search"></label>
-    <div class="field"><span>${tr('החברה', 'Company')}</span>
-      <div class="chips" style="margin-top:2px">${sites.map(s => `<button class="chip${MKT.site === s.site ? ' sel' : ''}" data-act="mktSite" data-v="${esc(s.site)}" aria-pressed="${MKT.site === s.site}">${esc(tr(s.he, s.en))}</button>`).join('')}<button class="chip${other ? ' sel' : ''}" data-act="mktSite" data-v="*" aria-pressed="${other}">${tr('חברה אחרת', 'Another company')}</button></div>
-    </div>
-    ${other ? `<label class="field"><span>${tr('כתובת האתר של החברה', "The company's website")}</span><input type="url" dir="ltr" data-on="mktOther" value="${esc(MKT.other)}" placeholder="berman.co.il" autocomplete="off" inputmode="url"></label>` : ''}
-    <button class="btn primary big block" data-act="mktGo">${icon('globe', 18)}${other ? tr('חיפוש באתר החברה', "Search the company's site") : tr(`חיפוש באתר של ${esc(mktSiteName(MKT.site))}`, `Search ${esc(mktSiteName(MKT.site))}'s site`)}</button>
+    <div id="mktCo" class="mktco">${mktCoHtml()}</div>
     <p class="small muted" style="margin:0">${tr('האתר של החברה ייפתח בתוך האפליקציה, רק עם תוצאות מהאתר שלה. פותחים את דף המוצר ולוחצים למטה על "קח את הערכים מהדף". לפני השמירה תוכל לבדוק את המספרים.', "The company's site opens inside the app, with results from that site only. Open the product's page and tap \"Use the values on this page\" at the bottom. You can check the numbers before saving.")}</p>
     ${mktPhotoHtml()}
     <button class="linkbtn" data-act="mktManual">${tr('או להקליד את הערכים מהתווית', 'Or type the values from the label')}</button>
   </div>`;
+}
+/** The company: a search over the whole list, suggestions, and the search button. */
+function mktCoHtml() {
+  const other = MKT.site === '*';
+  const b = other ? null : mktBrand(MKT.site);
+  const raw = b ? mktLabel(b) : '';
+  const name = esc(raw), poss = esc(/['’]s$/i.test(raw) ? raw : /s$/i.test(raw) ? raw + "'" : raw + "'s");
+  const n = MKT_BRANDS.length;
+  return `<div class="field"><span>${tr('החברה', 'Company')}</span>
+      <div class="searchbox">${icon('search', 18)}<input class="search" type="search" data-on="mktFind" value="${esc(MKT.find)}" placeholder="${tr(`חיפוש חברה או רשת (${n} ברשימה)`, `Find a company or chain (${n} listed)`)}" aria-label="${tr('חיפוש חברה', 'Find a company')}" autocomplete="off" enterkeyhint="search"></div>
+      <div id="mktFound">${mktFoundHtml()}</div>
+    </div>
+    ${other ? `<label class="field"><span>${tr('כתובת האתר של החברה', "The company's website")}</span><input type="url" dir="ltr" data-on="mktOther" value="${esc(MKT.other)}" placeholder="berman.co.il" autocomplete="off" inputmode="url"></label>` : ''}
+    ${mktNeedsEn(b) ? `<label class="field"><span>${tr(`האתר של ${name} באנגלית, לכן החיפוש בו יהיה:`, `${poss} site is in English, so the search is:`)}</span><input type="search" dir="ltr" data-on="mktQEn" value="${esc(mktQEn())}" autocomplete="off" enterkeyhint="search"></label>` : ''}
+    <button class="btn primary big block" data-act="mktGo">${icon('globe', 18)}${other ? tr('חיפוש באתר החברה', "Search the company's site") : tr(`חיפוש באתר של ${name}`, `Search ${poss} site`)}</button>`;
+}
+function mktChip(b) {
+  const on = MKT.site === b.site;
+  return `<button class="chip${on ? ' sel' : ''}" data-act="mktSite" data-v="${esc(b.site)}" aria-pressed="${on}">${esc(mktLabel(b))}</button>`;
+}
+/** Under the company search: what was found, or (before anything is typed) suggestions and the whole list by groups. */
+function mktFoundHtml() {
+  const otherOn = MKT.site === '*';
+  const other = `<button class="chip ghost${otherOn ? ' sel' : ''}" data-act="mktSite" data-v="*" aria-pressed="${otherOn}">${icon('plus', 16)}${tr('חברה אחרת', 'Another company')}</button>`;
+  if (mktFold(MKT.find)) {
+    const list = mktFindList(MKT.find);
+    return list.length ? `<div class="chips" style="margin-top:2px">${list.map(mktChip).join('')}${other}</div>`
+      : `<div class="small muted">${tr('לא מצאתי חברה בשם הזה. אפשר לכתוב את כתובת האתר שלה ב"חברה אחרת".', 'No company by that name. You can type its website under "Another company".')}</div><div class="chips" style="margin-top:2px">${other}</div>`;
+  }
+  // the companies named in the product, the one chosen, the last ones used and added, then the usual ones
+  const sug = [];
+  const add = (b) => { if (b && !sug.includes(b)) sug.push(b); };
+  MKT.found.slice(0, 3).forEach(add);
+  if (!otherOn) add(mktBrand(MKT.site));
+  mktSet().recent.forEach(s => add(mktBrand(s)));
+  mktMine().forEach(add);
+  MKT_SITES.forEach(add);
+  const auto = MKT.auto && MKT.found[0] && MKT.found[0].site === MKT.site;
+  return `<div class="chips" style="margin-top:2px">${sug.slice(0, 12).map(mktChip).join('')}${other}</div>
+    ${auto ? `<div class="small muted">${icon('sparkle', 14)} ${tr(`זיהיתי לפי שם המוצר: ${esc(mktLabel(MKT.found[0]))}`, `Found from the product's name: ${esc(mktLabel(MKT.found[0]))}`)}</div>` : ''}
+    <details class="mktall"><summary>${tr(`כל ${MKT_BRANDS.length} החברות לפי סוג`, `All ${MKT_BRANDS.length} companies by type`)}</summary>${mktAllHtml()}</details>`;
+}
+/** The whole list, by groups: Israeli sites first, then the rest, each by name. */
+function mktAllHtml() {
+  const he = LANG !== 'en';
+  const key = (b) => (b.e ? 1 : 0) * (he ? 1 : 0);
+  return Object.keys(BRAND_GROUPS).map(g => {
+    const list = MKT_BRANDS.filter(b => b.g === g).sort((a, b) => key(a) - key(b) || mktLabel(a).localeCompare(mktLabel(b), he && !a.e ? 'he' : 'en', { sensitivity: 'base' }));
+    return list.length ? `<div class="mktgrp"><div class="mktgrp-t">${tr(BRAND_GROUPS[g][0], BRAND_GROUPS[g][1])} <span class="muted">${list.length}</span></div><div class="chips">${list.map(mktChip).join('')}</div></div>` : '';
+  }).join('');
+}
+/** Shows the company part again (keeps the product name field as it is). */
+function mktCoRefresh() { const c = $('#mktCo'); if (c) c.innerHTML = mktCoHtml(); }
+let mktDetT = 0;
+/** While the product name is typed: the company named in it is chosen, unless the user chose one himself. */
+function mktRedetect() {
+  clearTimeout(mktDetT);
+  mktDetT = setTimeout(() => {
+    if (MKT.step !== 'search' || !$('#mktCo')) return;
+    MKT.found = mktDetect(`${MKT.q} ${MKT.food}`);
+    if (!MKT.picked && MKT.found[0]) { MKT.site = MKT.found[0].site; MKT.auto = true; }
+    mktCoRefresh();
+  }, 250);
 }
 /** Photograph the label, or pick a photo of it you already have. */
 function mktPhotoHtml() {
@@ -228,10 +423,13 @@ function mktReadFile(file) {
   img.onerror = () => { URL.revokeObjectURL(url); window.onLabelPhoto(null, 'error'); };
   img.src = url;
 }
-/** Google, limited to the company's site. */
+/** Google, limited to the company's sites: "(site:a OR site:b) cottage". */
 function mktSearchUrl(site, q) {
   q = String(q).replace(/׳/g, "'").replace(/״/g, '"');
-  return 'https://www.google.com/search?hl=' + (LANG === 'en' ? 'en' : 'iw') + '&q=' + encodeURIComponent(`site:${site} ${q}`.trim());
+  const b = mktBrand(site);
+  const ds = b ? b.d : [site];
+  const where = ds.length > 1 ? '(' + ds.map(d => 'site:' + d).join(' OR ') + ')' : 'site:' + ds[0];
+  return 'https://www.google.com/search?hl=' + (LANG === 'en' ? 'en' : 'iw') + '&q=' + encodeURIComponent(`${where} ${q}`.trim());
 }
 /** The Windows app (Tauri) opens the site in a second window with the same button. */
 const DESK = window.__TAURI__ && window.__TAURI__.core;
@@ -254,7 +452,7 @@ window.onWebValues = (s) => {
     return;
   }
   mktCloseWeb();
-  MKT.vals = { n: v.name || MKT.q, b: mktSiteName(v.host || MKT.site), site: v.host || MKT.site, url: v.url || '', k: v.k, p: v.p, c: v.c, f: v.f, g: v.g || null, missing: 4 - have };
+  MKT.vals = { n: v.name || MKT.q, b: mktSiteName(v.host || MKT.site), site: v.host || MKT.site, url: v.url || '', k: v.k, p: v.p, c: v.c, f: v.f, g: v.g || null, missing: 4 - have, conv: v.per === 'serving' && v.g ? v.g : 0 };
   MKT.step = 'confirm';
   replaceSheetBody('market', mktHtml());
 };
@@ -276,6 +474,7 @@ function mktConfirmHtml() {
     ${v.how === 'ocr' && MKT.gemErr ? `<div class="small warn-t">${tr(`Gemini לא הצליח (${esc(MKT.gemErr)}), אז הטלפון קרא את התמונה בעצמו.`, `Gemini didn't manage (${esc(MKT.gemErr)}), so the phone read the photo itself.`)}</div>` : ''}
     ${v.raw ? `<details class="small"><summary>${tr('הטקסט שזוהה בתמונה', 'Text found in the photo')}</summary><pre class="rawocr">${esc(v.raw)}</pre></details>` : ''}`
     : v.missing ? `<div class="small warn-t">${tr('לא מצאתי בדף את כל הערכים. השלם את החסר מהתווית.', "Not every value was on the page. Fill in what's missing from the label.")}</div>` : v.url ? `<div class="small muted">${tr(`הערכים נקראו מהאתר ${esc(v.site)}. כדאי לוודא שהם ל-100 גרם.`, `Values read from ${esc(v.site)}. Check that they are per 100 g.`)}</div>` : ''}
+    ${v.conv ? `<div class="small warn">${tr(`באתר הערכים הם למנה של ${v.conv} גרם, אז הם הומרו ל-100 גרם. כדאי לבדוק.`, `The site gives the values per serving of ${v.conv} g, so they were converted to 100 g. Worth checking.`)}</div>` : ''}
     <label class="field"><span>${tr('שם המוצר', 'Product name')}</span><input type="text" data-on="mktVal" data-k="n" value="${esc(v.n || '')}"></label>
     <div class="small muted" style="margin-bottom:-4px">${tr('ל-100 גרם', 'Per 100 g')}</div>
     ${field('k', tr('קלוריות', 'Calories'), '')}
@@ -320,21 +519,34 @@ function editProdHtml() {
 
 const MKT_ACT = {
   openMarket(el) { openMarket(el.dataset.name, el.dataset.from || 'nut', el.dataset.said || ''); },
-  mktSite(el) { MKT.site = el.dataset.v; replaceSheetBody('market', mktHtml()); if (MKT.site === '*') { const i = $('#sheets [data-on="mktOther"]'); if (i) i.focus(); } },
+  mktSite(el) {
+    MKT.site = el.dataset.v; MKT.picked = true; MKT.auto = false; MKT.find = ''; MKT.qEnEdited = false;
+    mktCoRefresh();
+    const co = $('#mktCo');
+    if (MKT.site === '*') { const i = $('#sheets [data-on="mktOther"]'); if (i) i.focus(); }
+    else if (co && co.scrollIntoView) co.scrollIntoView({ block: 'nearest' });
+  },
   mktGo() {
-    const q = String(MKT.q || '').trim();
+    let q = String(MKT.q || '').trim();
     if (!q) { toast(tr('כתוב את שם המוצר', 'Type the product name')); return; }
     let site = MKT.site;
+    const m = mktSet();
     if (site === '*') {
       site = mktDomain(MKT.other);
       if (!site) { toast(tr('כתוב את כתובת האתר של החברה, למשל berman.co.il', "Type the company's website, e.g. berman.co.il")); return; }
-      const m = mktSet();
-      if (!MKT_SITES.some(x => x.site === site) && !m.mine.includes(site)) m.mine.push(site);
+      const known = mktBrand(site);
+      if (known && !known.mine) site = known.site;
+      else if (!m.mine.includes(site)) m.mine.push(site);
       MKT.site = site;
     }
-    mktSet().site = site; save();
+    const b = mktBrand(site);
+    if (mktNeedsEn(b)) q = mktQEn().trim() || b.en;
+    m.site = site;
+    m.recent = [site].concat(m.recent.filter(s => s !== site)).slice(0, 6);
+    save();
     mktOpenWeb(mktSearchUrl(site, q));
-    replaceSheetBody('market', mktHtml());
+    MKT.find = '';
+    mktCoRefresh();
   },
   mktPaste() {
     const c = A && A.readClipboard ? A.readClipboard() : '';
@@ -368,7 +580,9 @@ const MKT_ACT = {
   eProdOff() { if (EDIT.it) delete EDIT.it.prod; mktAfterChange(); },
 };
 const MKT_ON = {
-  mktQ(el) { MKT.q = el.value; },
+  mktQ(el) { MKT.q = el.value; MKT.qEnEdited = false; mktRedetect(); },
+  mktFind(el) { MKT.find = el.value; const f = $('#mktFound'); if (f) f.innerHTML = mktFoundHtml(); },
+  mktQEn(el) { MKT.qEn = el.value; MKT.qEnEdited = true; },
   mktOther(el) { MKT.other = el.value; },
   mktVal(el) {
     const k = el.dataset.k;
